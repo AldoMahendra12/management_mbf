@@ -1,8 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configuration (Must be set in Vercel Environment Variables)
-const WA_PHONE = process.env.VITE_WA_PHONE; // Example: +628123456789
-const WA_APIKEY = process.env.VITE_WA_APIKEY; // API Key from CallMeBot
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -57,29 +55,42 @@ export default async function handler(req: any, res: any) {
 
     message += `Silakan hubungi supplier segera. Terimakasih! 🙏`;
 
-    // 5. Send via CallMeBot WhatsApp API
-    if (WA_PHONE && WA_APIKEY) {
-      // Endpoint format: https://api.callmebot.com/whatsapp.php?phone=[phone]&text=[message]&apikey=[apikey]
-      const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(WA_PHONE)}&text=${encodeURIComponent(message)}&apikey=${encodeURIComponent(WA_APIKEY)}`;
-      
-      const waResponse = await fetch(url, {
-        method: 'GET'
-      });
+    // 5. Send via CallMeBot WhatsApp API to multiple numbers
+    const targets = [
+      { phone: process.env.VITE_WA_PHONE_1 || process.env.VITE_WA_PHONE, apikey: process.env.VITE_WA_APIKEY_1 || process.env.VITE_WA_APIKEY },
+      { phone: process.env.VITE_WA_PHONE_2, apikey: process.env.VITE_WA_APIKEY_2 },
+      { phone: process.env.VITE_WA_PHONE_3, apikey: process.env.VITE_WA_APIKEY_3 }
+    ].filter(t => t.phone && t.apikey);
 
-      const responseText = await waResponse.text();
+    if (targets.length > 0) {
+      let sentCount = 0;
+      
+      for (const target of targets) {
+        // Endpoint format: https://api.callmebot.com/whatsapp.php?phone=[phone]&text=[message]&apikey=[apikey]
+        const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(target.phone as string)}&text=${encodeURIComponent(message)}&apikey=${encodeURIComponent(target.apikey as string)}`;
+        
+        try {
+          const waResponse = await fetch(url, { method: 'GET' });
+          if (waResponse.ok) {
+            sentCount++;
+          }
+        } catch (e) {
+          console.error(`Failed sending to ${target.phone}`);
+        }
+      }
       
       return res.status(200).json({ 
         success: true, 
-        message_sent: waResponse.ok,
+        message_sent: sentCount > 0,
+        targets_reached: sentCount,
         critical_count: criticalItems.length,
-        api_response: responseText,
         timestamp: new Date().toISOString()
       });
     } else {
       return res.status(200).json({
         success: true,
         message_sent: false,
-        reason: 'WA_PHONE or WA_APIKEY missing',
+        reason: 'WA_PHONE or WA_APIKEY variables missing',
         critical_items: criticalItems
       });
     }

@@ -1,21 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Configuration (Must be set in Vercel Environment Variables)
-const TELEGRAM_BOT_TOKEN = process.env.VITE_TELEGRAM_BOT_TOKEN;
-const TELEGRAM_CHAT_ID = process.env.VITE_TELEGRAM_CHAT_ID; 
+const WA_PHONE = process.env.VITE_WA_PHONE; // Example: +628123456789
+const WA_APIKEY = process.env.VITE_WA_APIKEY; // API Key from CallMeBot
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const CRON_SECRET = process.env.CRON_SECRET;
 
 export default async function handler(req: any, res: any) {
   // 1. Security Check
-  // Vercel sends a specific header for cron jobs if CRON_SECRET is set
   const authHeader = req.headers['authorization'];
   if (CRON_SECRET && authHeader !== `Bearer ${CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized access to cron' });
   }
 
-  // Handle only GET requests (Vercel Cron uses GET)
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -47,46 +45,41 @@ export default async function handler(req: any, res: any) {
       });
     }
 
-    // 4. Format Telegram Message
-    let message = `⚠️ <b>LAPORAN STOK KRITIS PAKAN</b> ⚠️\n`;
-    message += `<b>PT MBF & CV BEF</b>\n\n`;
+    // 4. Format WhatsApp Message (CallMeBot uses URL encoding for formatting)
+    let message = `⚠️ *LAPORAN STOK KRITIS PAKAN* ⚠️\n`;
+    message += `*PT MBF & CV BEF*\n\n`;
     message += `Halo Bos, berikut daftar pakan yang perlu segera di-restock hari ini:\n\n`;
 
     criticalItems.forEach((item, index) => {
-      message += `${index + 1}. <b>${item.nama_bahan}</b>\n`;
+      message += `${index + 1}. *${item.nama_bahan}*\n`;
       message += `   Sisa: ${item.stok_sekarang} ${item.satuan} (Min: ${item.batas_minimum} ${item.satuan})\n\n`;
     });
 
     message += `Silakan hubungi supplier segera. Terimakasih! 🙏`;
 
-    // 5. Send via Telegram Bot API
-    if (TELEGRAM_BOT_TOKEN && TELEGRAM_CHAT_ID) {
-      const telegramResponse = await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json' 
-        },
-        body: JSON.stringify({
-          chat_id: TELEGRAM_CHAT_ID,
-          text: message,
-          parse_mode: 'HTML'
-        })
+    // 5. Send via CallMeBot WhatsApp API
+    if (WA_PHONE && WA_APIKEY) {
+      // Endpoint format: https://api.callmebot.com/whatsapp.php?phone=[phone]&text=[message]&apikey=[apikey]
+      const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(WA_PHONE)}&text=${encodeURIComponent(message)}&apikey=${encodeURIComponent(WA_APIKEY)}`;
+      
+      const waResponse = await fetch(url, {
+        method: 'GET'
       });
 
-      const telegramResult = await telegramResponse.json();
+      const responseText = await waResponse.text();
       
       return res.status(200).json({ 
         success: true, 
-        message_sent: true,
+        message_sent: waResponse.ok,
         critical_count: criticalItems.length,
-        telegram_api_status: telegramResult.ok,
+        api_response: responseText,
         timestamp: new Date().toISOString()
       });
     } else {
       return res.status(200).json({
         success: true,
         message_sent: false,
-        reason: 'TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID missing',
+        reason: 'WA_PHONE or WA_APIKEY missing',
         critical_items: criticalItems
       });
     }

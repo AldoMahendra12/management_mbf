@@ -2,11 +2,16 @@ import { useState, useCallback } from 'react';
 
 // Fallback static data
 const FALLBACK_FEED_ITEMS = [
-  { id: 'f1',  nama_bahan: 'Katul',           satuan: 'kg',  stok_sekarang: 1800, batas_minimum: 500,  harga_jual_default: 6600 },
-  { id: 'f2',  nama_bahan: 'Jagung',          satuan: 'kg',  stok_sekarang: 620,  batas_minimum: 1000, harga_jual_default: 4500 },
-  { id: 'f3',  nama_bahan: 'Konsentrat',      satuan: 'kg',  stok_sekarang: 450,  batas_minimum: 200,  harga_jual_default: 387500 },
-  { id: 'f4',  nama_bahan: 'Premix',          satuan: 'kg',  stok_sekarang: 80,   batas_minimum: 50,   harga_jual_default: 410000 },
-  { id: 'f5',  nama_bahan: 'Pakan Jadi',      satuan: 'setel', stok_sekarang: 24, batas_minimum: 10,   harga_jual_default: 416500 },
+  { id: 'f1',  nama_bahan: 'Jagung',          satuan: 'kg',  stok_sekarang: 0, batas_minimum: 2000, harga_jual_default: 6600 },
+  { id: 'f2',  nama_bahan: 'Katul (Bekatul)', satuan: 'kg',  stok_sekarang: 0, batas_minimum: 1000, harga_jual_default: 4500 },
+  { id: 'f3',  nama_bahan: 'Super 36 SPR',    satuan: 'sak', stok_sekarang: 0, batas_minimum: 10,   harga_jual_default: 387500 },
+  { id: 'f4',  nama_bahan: 'Super 36',        satuan: 'sak', stok_sekarang: 0, batas_minimum: 10,   harga_jual_default: 410000 },
+  { id: 'f5',  nama_bahan: 'PAR S',           satuan: 'sak', stok_sekarang: 0, batas_minimum: 10,   harga_jual_default: 416500 },
+  { id: 'f6',  nama_bahan: 'PAR G',           satuan: 'sak', stok_sekarang: 0, batas_minimum: 10,   harga_jual_default: 388000 },
+  { id: 'f7',  nama_bahan: 'PAR DOC',         satuan: 'sak', stok_sekarang: 0, batas_minimum: 10,   harga_jual_default: 436500 },
+  { id: 'f8',  nama_bahan: 'Mineral',         satuan: 'kg',  stok_sekarang: 0, batas_minimum: 50,   harga_jual_default: 4000 },
+  { id: 'f9',  nama_bahan: 'SAMS QUIN',       satuan: 'sak', stok_sekarang: 0, batas_minimum: 10,   harga_jual_default: 328500 },
+  { id: 'f10', nama_bahan: 'MIX SAMS',        satuan: 'sak', stok_sekarang: 0, batas_minimum: 10,   harga_jual_default: 70000 },
 ];
 
 export const useSupabaseData = (supabase: any) => {
@@ -70,9 +75,10 @@ export const useSupabaseData = (supabase: any) => {
         const isHorn = !isArab; 
         
         const amount = Number(curr.jumlah_kg) || 0;
+        const type = (curr.jenis_transaksi || '').toLowerCase();
 
-        const isAdd = ['Terima Setoran', 'Beli Telur'].includes(curr.jenis_transaksi);
-        const isSub = ['Jual ke Luar', 'Jual Telur'].includes(curr.jenis_transaksi);
+        const isAdd = type.includes('terima') || type.includes('beli') || type.includes('setoran');
+        const isSub = type.includes('jual') || type.includes('keluar');
 
         if (isAdd) {
           if (isHorn) acc.horn += amount;
@@ -147,7 +153,8 @@ export const useSupabaseData = (supabase: any) => {
       const { data, error } = await supabase
         .from('transaksi_afkir')
         .select('*')
-        .order('tanggal', { ascending: false });
+        .order('tanggal', { ascending: false })
+        .order('created_at', { ascending: false });
 
       if (error) {
         // Table may not exist, use mock data
@@ -190,8 +197,8 @@ export const useSupabaseData = (supabase: any) => {
   return {
     feedItems, fetchFeedMaster, isLoadingFeedItems,
     eggStock, fetchEggStock,
-    feedTransactions, fetchFeedTransactions, isLoadingFeedTrx,
-    eggTransactions, fetchEggTransactions, isLoadingEggs,
+    feedTransactions, fetchFeedTransactions, isLoadingFeedTrx, setFeedTransactions,
+    eggTransactions, fetchEggTransactions, isLoadingEggs, setEggTransactions,
     afkirTransactions, fetchAfkirTransactions, isLoadingAfkir,
     paymentHistory, fetchPaymentHistory, setPaymentHistory,
     isLoading

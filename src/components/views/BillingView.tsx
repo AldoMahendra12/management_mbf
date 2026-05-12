@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SectionContainer } from '../layout/SectionContainer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { generateInvoiceCode } from '@/lib/invoice-utils';
@@ -49,7 +50,12 @@ export function BillingView() {
     formatMoney,
     eggPayables,
     feedPayables,
-    feedItems
+    feedItems,
+    isLoading,
+    fetchEggTransactions,
+    fetchEggStock,
+    fetchFeedTransactions,
+    fetchFeedMaster
   } = useDashboard();
 
   // Grouping logic for feedRecv to combine multiple items/transactions by same customer on same day
@@ -92,8 +98,10 @@ export function BillingView() {
   const [statusFilter, setStatusFilter] = useState<'Semua' | 'Belum Lunas' | 'Lunas'>('Semua');
 
   // Helper: resolves the paid amount for both egg (jumlah_dibayar) and feed (dibayar_hari_ini) schemas
-  const getPaid = (t: any) => t.jumlah_dibayar ?? t.dibayar_hari_ini ?? 0;
-
+  const getPaid = (row: any) => {
+    const val = row.jumlah_dibayar !== undefined ? row.jumlah_dibayar : row.dibayar_hari_ini;
+    return Number(val || 0);
+  };
   // Aging helper
   const getAgingDays = (date: string) => {
     const now = new Date();
@@ -131,25 +139,41 @@ export function BillingView() {
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Tagihan & Piutang</h1>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kelola penagihan telur dan pakan mitra</p>
           </div>
-          <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200/60 shadow-inner">
-            <button 
-              onClick={() => setBillingMode('telur')}
-              className={cn(
-                "px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                billingMode === 'telur' ? "bg-orange-500 text-white shadow-md shadow-orange-500/20" : "text-slate-600 hover:text-slate-900"
-              )}
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => { fetchEggTransactions(); fetchEggStock(); fetchFeedTransactions(); fetchFeedMaster(); }}
+              className="h-9 w-9 p-0 rounded-xl bg-slate-100 text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-all shadow-sm"
+              title="Segarkan Data"
             >
-              Tagihan Telur (CV BEF)
-            </button>
-            <button 
-              onClick={() => setBillingMode('pakan')}
-              className={cn(
-                "px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
-                billingMode === 'pakan' ? "bg-orange-500 text-white shadow-md shadow-orange-500/20" : "text-slate-600 hover:text-slate-900"
-              )}
-            >
-              Tagihan Pakan (PT MBF)
-            </button>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={cn("transition-transform duration-500", isLoading ? "animate-spin" : "hover:rotate-180")}>
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                <path d="M3 21v-5h5" />
+              </svg>
+            </Button>
+            <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200/60 shadow-inner">
+              <button 
+                onClick={() => setBillingMode('telur')}
+                className={cn(
+                  "px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  billingMode === 'telur' ? "bg-orange-500 text-white shadow-md shadow-orange-500/20" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                Tagihan Telur (CV BEF)
+              </button>
+              <button 
+                onClick={() => setBillingMode('pakan')}
+                className={cn(
+                  "px-8 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                  billingMode === 'pakan' ? "bg-orange-500 text-white shadow-md shadow-orange-500/20" : "text-slate-600 hover:text-slate-900"
+                )}
+              >
+                Tagihan Pakan (PT MBF)
+              </button>
+            </div>
           </div>
         </div>
 
@@ -308,13 +332,27 @@ export function BillingView() {
                           });
                         }
 
+                        if (list.length === 0) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={5}>
+                                <EmptyState 
+                                  icon={FileText} 
+                                  title="Invoice Tidak Ditemukan" 
+                                  description="Tidak ada catatan tagihan telur yang sesuai dengan filter saat ini." 
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
+                        }
+
                         return list.map((row: any, i: number) => {
                           const diff = (row.total_harga || 0) - (row.jumlah_dibayar || 0);
                           const status = diff === 0 ? 'Lunas' : row.jumlah_dibayar > 0 ? 'Sebagian' : 'Belum Bayar';
                           const customer = (row.keterangan || '').split('|')[0]?.replace('Mitra: ', '').trim() || '-';
 
                           return (
-                            <TableRow key={i} className="group border-slate-50 hover:bg-slate-50 transition-colors">
+                            <TableRow key={row.id || i} className="group border-slate-50 hover:bg-slate-50 transition-colors">
                                <TableCell className="pl-6 py-4">
                                   <div className="flex flex-col">
                                     <span className="text-xs font-black text-slate-900 tracking-tight uppercase">
@@ -409,7 +447,7 @@ export function BillingView() {
                          <div ref={printRefTelur} className="print:m-0 print:p-0 flex justify-center print:block">
                             <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in]">
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
-                                  <img src={logoBEF} alt="" className="w-[60%] h-auto object-contain -rotate-12" />
+                                  <img src={logoBEF} alt="" className="w-[60%] h-auto object-contain" />
                                </div>
 
                                <div className="relative z-10 h-full w-full flex flex-col gap-4">
@@ -628,13 +666,33 @@ export function BillingView() {
                         if (billingSubMode === 'piutang' && agingFilter !== 'all') list = list.filter((t: any) => getAgingCat(t.created_at || t.tanggal) === agingFilter);
                         if (statusFilter !== 'Semua') {
                           list = list.filter((row: any) => {
-                            const diff = (row.total_tagihan || 0) - getPaid(row);
-                            return (diff === 0 ? 'Lunas' : 'Belum Lunas') === statusFilter;
+                            const total = Number(row.total_tagihan) || 0;
+                            const paid = Number(getPaid(row)) || 0;
+                            const diff = total - paid;
+                            return (diff <= 0 ? 'Lunas' : 'Belum Lunas') === statusFilter;
                           });
                         }
                         if (searchQuery) {
                           const q = searchQuery.toLowerCase();
-                          list = list.filter((row: any) => (row.nama_mitra || row.keterangan || '').toLowerCase().includes(q));
+                          list = list.filter((row: any) => {
+                            const name = (row.nama_mitra || '').toLowerCase();
+                            const ket = (row.keterangan || '').toLowerCase();
+                            return name.includes(q) || ket.includes(q);
+                          });
+                        }
+
+                        if (list.length === 0) {
+                          return (
+                            <TableRow>
+                              <TableCell colSpan={5}>
+                                <EmptyState 
+                                  icon={FileText} 
+                                  title="Invoice Tidak Ditemukan" 
+                                  description="Tidak ada catatan tagihan pakan yang sesuai dengan filter saat ini." 
+                                />
+                              </TableCell>
+                            </TableRow>
+                          );
                         }
 
                         return list.map((row: any, i: number) => {
@@ -642,7 +700,7 @@ export function BillingView() {
                           const status = diff === 0 ? 'Lunas' : getPaid(row) > 0 ? 'Sebagian' : 'Belum Bayar';
                           const customer = row.nama_mitra || row.keterangan?.replace('Mitra: ', '') || '-';
                           return (
-                            <TableRow key={i} className="group border-slate-50 hover:bg-slate-50 transition-colors">
+                            <TableRow key={row.id || i} className="group border-slate-50 hover:bg-slate-50 transition-colors">
                                <TableCell className="pl-6 py-4">
                                   <div className="flex flex-col">
                                     <span className="text-xs font-black text-slate-900 tracking-tight uppercase">{generateInvoiceCode(row.id, row.created_at || row.tanggal, 'MBF')}</span>
@@ -712,7 +770,7 @@ export function BillingView() {
                          <div ref={printRefPakan} className="print:m-0 print:p-0 flex justify-center print:block">
                             <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in]">
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
-                                  <img src={logoMBF} alt="" className="w-[60%] h-auto object-contain -rotate-12" />
+                                  <img src={logoMBF} alt="" className="w-[60%] h-auto object-contain" />
                                </div>
 
                                <div className="relative z-10 h-full w-full flex flex-col gap-4">

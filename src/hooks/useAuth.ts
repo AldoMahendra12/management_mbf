@@ -8,6 +8,17 @@ export const useAuth = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   useEffect(() => {
+    // Check for sandbox user first
+    const sandboxUser = localStorage.getItem('mbf_sandbox_user');
+    if (sandboxUser) {
+      const data = JSON.parse(sandboxUser);
+      setSession({ user: { id: 'sandbox-id', email: 'trial@mbf.local' } });
+      setUserRole('editor'); // Give editor permissions but we'll block DB calls in Context
+      setUserDisplayName(data.name || 'User Trial');
+      setIsAuthLoading(false);
+      return;
+    }
+
     if (!supabase) {
       setTimeout(() => setIsAuthLoading(false), 1000);
       return;

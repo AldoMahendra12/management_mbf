@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   DollarSign, 
   History, 
@@ -16,18 +16,22 @@ import {
   Bell,
   Calendar
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { SectionContainer } from '../layout/SectionContainer';
 import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 import { useDashboard } from '../../contexts/DashboardContext';
 
 export function DashboardView() {
   const [activityPage, setActivityPage] = useState(1);
+  const [showNotifs, setShowNotifs] = useState(false);
   const { 
     dashboardStats, 
     eggReceivables, 
+    eggPayables,
     feedRecv, 
+    feedPayables,
     feedItems,
     recentCombinedActivities, 
     setActiveTab,
@@ -36,36 +40,41 @@ export function DashboardView() {
   } = useDashboard();
   
   // Compute top debtors (piutang)
-  const topPiutang = [
-    ...(eggReceivables || []).map(t => ({ ...t, source: 'Telur' })), 
-    ...((feedRecv || []).filter(t => (t.total_tagihan - (t.dibayar_hari_ini || 0)) > 0).map(t => ({ ...t, source: 'Pakan' })))
-  ]
-    .filter(t => (t.total_harga || t.total_tagihan || 0) - (t.jumlah_dibayar ?? t.dibayar_hari_ini ?? 0) > 0)
-    .sort((a, b) => ((b.total_harga || b.total_tagihan || 0) - (b.jumlah_dibayar ?? b.dibayar_hari_ini ?? 0)) - ((a.total_harga || a.total_tagihan || 0) - (a.jumlah_dibayar ?? a.dibayar_hari_ini ?? 0)))
-    .slice(0, 4)
-    .map(row => ({
-      customer: (row.nama_mitra || row.keterangan?.replace('Mitra: ', '') || 'Unknown').split('|')[0].trim(),
-      remains: (row.total_harga || row.total_tagihan || 0) - (row.jumlah_dibayar ?? row.dibayar_hari_ini ?? 0),
-      source: row.source
-    }));
+  const topPiutang = useMemo(() => {
+    return [
+      ...(eggReceivables || []).map(t => ({ ...t, source: 'Telur' })), 
+      ...((feedRecv || []).filter(t => (t.total_tagihan - (t.dibayar_hari_ini || 0)) > 0).map(t => ({ ...t, source: 'Pakan' })))
+    ]
+      .filter(t => (t.total_harga || t.total_tagihan || 0) - (t.jumlah_dibayar ?? t.dibayar_hari_ini ?? 0) > 0)
+      .sort((a, b) => ((b.total_harga || b.total_tagihan || 0) - (b.jumlah_dibayar ?? b.dibayar_hari_ini ?? 0)) - ((a.total_harga || a.total_tagihan || 0) - (a.jumlah_dibayar ?? a.dibayar_hari_ini ?? 0)))
+      .slice(0, 4)
+      .map(row => ({
+        customer: (row.nama_mitra || row.keterangan?.replace('Mitra: ', '') || 'Unknown').split('|')[0].trim(),
+        remains: (row.total_harga || row.total_tagihan || 0) - (row.jumlah_dibayar ?? row.dibayar_hari_ini ?? 0),
+        source: row.source
+      }));
+  }, [eggReceivables, feedRecv]);
 
   // Compute top utang
-  const topUtang = [
-    ...(feedRecv || []).map(t => ({ ...t, source: 'Pakan' })),
-    ...(eggReceivables || []).map(t => ({ ...t, source: 'Telur' }))
-  ]
-    .filter(t => (t.total_harga || t.total_tagihan || 0) - (t.jumlah_dibayar ?? t.dibayar_hari_ini ?? 0) > 0)
-    .sort((a, b) => ((b.total_harga || b.total_tagihan || 0) - (b.jumlah_dibayar ?? b.dibayar_hari_ini ?? 0)) - ((a.total_harga || a.total_tagihan || 0) - (a.jumlah_dibayar ?? a.dibayar_hari_ini ?? 0)))
-    .slice(0, 4)
-    .map(row => ({
-      customer: (row.nama_mitra || row.keterangan?.replace('Mitra: ', '') || 'Unknown').split('|')[0].trim(),
-      remains: (row.total_harga || row.total_tagihan || 0) - (row.jumlah_dibayar ?? row.dibayar_hari_ini ?? 0),
-      source: row.source
-    }));
+  const topUtang = useMemo(() => {
+    return [
+      ...(eggPayables || []).map(t => ({ ...t, source: 'Telur' })),
+      ...(feedPayables || []).map(t => ({ ...t, source: 'Pakan' }))
+    ]
+      .filter(t => (t.total_harga || t.total_tagihan || 0) - (t.jumlah_dibayar ?? t.dibayar_hari_ini ?? 0) > 0)
+      .sort((a, b) => ((b.total_harga || b.total_tagihan || 0) - (b.jumlah_dibayar ?? b.dibayar_hari_ini ?? 0)) - ((a.total_harga || a.total_tagihan || 0) - (a.jumlah_dibayar ?? a.dibayar_hari_ini ?? 0)))
+      .slice(0, 4)
+      .map(row => ({
+        customer: (row.nama_mitra || row.keterangan?.replace('Mitra: ', '') || 'Unknown').split('|')[0].trim(),
+        remains: (row.total_harga || row.total_tagihan || 0) - (row.jumlah_dibayar ?? row.dibayar_hari_ini ?? 0),
+        source: row.source
+      }));
+  }, [eggPayables, feedPayables]);
 
   // Activity icon helper
   const getActivityIcon = (type: string) => {
     const t = type?.toLowerCase() || '';
+    if (t.includes('afkir')) return Bird;
     if (t.includes('telur') || t.includes('setoran')) return Egg;
     if (t.includes('jual') || t.includes('kirim')) return Truck;
     if (t.includes('pakan') || t.includes('masuk')) return Package;
@@ -84,8 +93,8 @@ export function DashboardView() {
 
   // Activity name helper
   const getActivityName = (act: any) => {
-    const type = act.jenis_transaksi?.toLowerCase() || '';
-    if (type.includes('afkir')) return 'Afkir';
+    const type = (act.jenis_transaksi || '').toLowerCase();
+    if (type.includes('afkir') || act.source === 'Afkir') return 'Afkir Ayam';
     if (type.includes('jual pakan') || type.includes('pakan_keluar')) return 'Jual Pakan';
     if (type.includes('beli pakan') || type.includes('pakan_masuk') || type.includes('tambah stok')) return 'Beli Pakan';
     if (type.includes('jual telur') || act.source === 'Telur') return 'Jual Telur';
@@ -123,13 +132,45 @@ export function DashboardView() {
     formattedName = `Bu ${formattedName}`;
   }
 
+  // Generate dynamic alerts
+  const alerts = useMemo(() => {
+    const list: any[] = [];
+    
+    // Critical feed alerts
+    feedItems?.forEach((item: any) => {
+      if (item.stok_sekarang <= (item.batas_minimum || 50)) {
+        list.push({
+          id: `feed-${item.id}`,
+          type: 'critical',
+          title: 'Stok Pakan Kritis',
+          message: `${item.nama_bahan} sisa ${item.stok_sekarang} ${item.satuan}. Segera pesan!`,
+          time: 'Sekarang'
+        });
+      }
+    });
+
+    // Unpaid receivables alerts
+    const unpaidCount = topPiutang.length;
+    if (unpaidCount > 0) {
+      list.push({
+        id: 'piutang-alert',
+        type: 'warning',
+        title: 'Tagihan Pending',
+        message: `Ada ${unpaidCount} mitra dengan piutang yang belum lunas.`,
+        time: 'Hari ini'
+      });
+    }
+
+    return list;
+  }, [feedItems, topPiutang]);
+
   return (
     <SectionContainer className="space-y-6">
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            Selamat datang, {formattedName}
+            Assalamu'alaikum, {formattedName}
             <motion.span 
               animate={{ rotate: [0, 15, -10, 15, 0] }}
               transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
@@ -151,10 +192,79 @@ export function DashboardView() {
           </div>
 
           {/* Notification Bell */}
-          <button className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-400 hover:text-orange-600 hover:border-orange-200 transition-all shadow-sm relative group">
-            <Bell size={20} />
-            <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-white group-hover:animate-ping" />
-          </button>
+          <div className="relative">
+            <button 
+              onClick={() => setShowNotifs(!showNotifs)}
+              className={cn(
+                "w-11 h-11 rounded-xl bg-white border flex items-center justify-center transition-all shadow-sm relative group",
+                showNotifs ? "border-orange-500 text-orange-600 ring-4 ring-orange-500/5" : "border-slate-200 text-slate-400 hover:text-orange-600 hover:border-orange-200"
+              )}
+            >
+              <Bell size={20} />
+              {alerts.length > 0 && (
+                <span className="absolute top-3 right-3 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-white group-hover:animate-ping" />
+              )}
+            </button>
+
+            {/* Notification Dropdown */}
+            {showNotifs && (
+              <div className="fixed inset-0 z-40" onClick={() => setShowNotifs(false)} />
+            )}
+            <AnimatePresence>
+              {showNotifs && (
+                <motion.div
+                  key="notif-dropdown"
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 mt-3 w-80 bg-white border border-slate-200 rounded-2xl shadow-2xl z-50 overflow-hidden"
+                >
+                    <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                      <h4 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em]">Notifikasi</h4>
+                      <Badge className="bg-orange-500 text-white border-none text-[9px] font-black">{alerts.length} BARU</Badge>
+                    </div>
+                    
+                    <div className="max-h-[350px] overflow-y-auto py-2 custom-scrollbar">
+                      {alerts.length > 0 ? alerts.map((notif) => (
+                        <div key={notif.id} className="px-4 py-3 hover:bg-slate-50 transition-colors cursor-pointer border-b border-slate-50 last:border-0 group">
+                          <div className="flex gap-3">
+                            <div className={cn(
+                              "w-8 h-8 rounded-xl shrink-0 flex items-center justify-center",
+                              notif.type === 'critical' ? "bg-rose-50 text-rose-500" : "bg-amber-50 text-amber-500"
+                            )}>
+                              {notif.type === 'critical' ? <AlertCircle size={14} /> : <DollarSign size={14} />}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-0.5">
+                                <p className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{notif.title}</p>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase">{notif.time}</span>
+                              </div>
+                              <p className="text-[11px] font-medium text-slate-500 leading-tight line-clamp-2">
+                                {notif.message}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )) : (
+                        <div className="py-12 text-center">
+                          <Bell size={24} className="text-slate-200 mx-auto mb-2" />
+                          <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Tidak ada notifikasi baru</p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-3 bg-slate-50 border-t border-slate-100">
+                      <button 
+                        onClick={() => setShowNotifs(false)}
+                        className="w-full py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest hover:text-slate-900 transition-colors"
+                      >
+                        Tandai semua dibaca
+                      </button>
+                    </div>
+                  </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
 
@@ -167,10 +277,20 @@ export function DashboardView() {
             <h3 className={cn("font-black text-slate-900 mt-3 tracking-tighter tabular-nums", (dashboardStats?.piutang || 0) >= 1000000 ? "text-xl" : "text-2xl")}>{formatMoney(dashboardStats?.piutang || 0)}</h3>
             <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Sisa tagihan aktif</p>
           </div>
-          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-slate-200 bg-slate-50/50 group-hover:border-t-orange-500 transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-400 -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out z-0" />
-            <span className="relative z-10 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors duration-500">Lihat tagihan</span>
-            <ArrowRight size={14} className="relative z-10 text-slate-400 group-hover:translate-x-1 group-hover:text-white transition-all duration-500" />
+          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-orange-500 bg-orange-500 transition-all duration-500">
+            <div className="relative z-10 text-[10px] font-black text-white uppercase tracking-widest flex h-4 overflow-hidden">
+              {"Lihat tagihan".split('').map((char, i) => (
+                <span key={i} className="relative inline-block overflow-hidden">
+                  <span className="block transition-transform duration-500 group-hover:-translate-y-full" style={{ transitionDelay: `${i * 30}ms` }}>
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                  <span className="block absolute top-0 left-0 transition-transform duration-500 translate-y-full group-hover:translate-y-0" style={{ transitionDelay: `${i * 30}ms` }}>
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                </span>
+              ))}
+            </div>
+            <ArrowRight size={14} className="relative z-10 text-white group-hover:translate-x-1 transition-all duration-500" />
           </div>
         </div>
 
@@ -181,10 +301,20 @@ export function DashboardView() {
             <h3 className={cn("font-black text-slate-900 mt-3 tracking-tighter tabular-nums", (dashboardStats?.hutang || 0) >= 1000000 ? "text-xl" : "text-2xl")}>{formatMoney(dashboardStats?.hutang || 0)}</h3>
             <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Kewajiban ke mitra</p>
           </div>
-          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-slate-200 bg-slate-50/50 group-hover:border-t-orange-500 transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-400 -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out z-0" />
-            <span className="relative z-10 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors duration-500">Lihat tagihan</span>
-            <ArrowRight size={14} className="relative z-10 text-slate-400 group-hover:translate-x-1 group-hover:text-white transition-all duration-500" />
+          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-orange-500 bg-orange-500 transition-all duration-500">
+            <div className="relative z-10 text-[10px] font-black text-white uppercase tracking-widest flex h-4 overflow-hidden">
+              {"Lihat tagihan".split('').map((char, i) => (
+                <span key={i} className="relative inline-block overflow-hidden">
+                  <span className="block transition-transform duration-500 group-hover:-translate-y-full" style={{ transitionDelay: `${i * 30}ms` }}>
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                  <span className="block absolute top-0 left-0 transition-transform duration-500 translate-y-full group-hover:translate-y-0" style={{ transitionDelay: `${i * 30}ms` }}>
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                </span>
+              ))}
+            </div>
+            <ArrowRight size={14} className="relative z-10 text-white group-hover:translate-x-1 transition-all duration-500" />
           </div>
         </div>
 
@@ -197,10 +327,20 @@ export function DashboardView() {
             </h3>
             <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Tersedia di gudang</p>
           </div>
-          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-slate-200 bg-slate-50/50 group-hover:border-t-orange-500 transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-400 -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out z-0" />
-            <span className="relative z-10 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors duration-500">Lihat gudang</span>
-            <ArrowRight size={14} className="relative z-10 text-slate-400 group-hover:translate-x-1 group-hover:text-white transition-all duration-500" />
+          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-orange-500 bg-orange-500 transition-all duration-500">
+            <div className="relative z-10 text-[10px] font-black text-white uppercase tracking-widest flex h-4 overflow-hidden">
+              {"Lihat gudang".split('').map((char, i) => (
+                <span key={i} className="relative inline-block overflow-hidden">
+                  <span className="block transition-transform duration-500 group-hover:-translate-y-full" style={{ transitionDelay: `${i * 30}ms` }}>
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                  <span className="block absolute top-0 left-0 transition-transform duration-500 translate-y-full group-hover:translate-y-0" style={{ transitionDelay: `${i * 30}ms` }}>
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                </span>
+              ))}
+            </div>
+            <ArrowRight size={14} className="relative z-10 text-white group-hover:translate-x-1 transition-all duration-500" />
           </div>
         </div>
 
@@ -216,10 +356,20 @@ export function DashboardView() {
             </h3>
             <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Perlu restock segera</p>
           </div>
-          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-slate-200 bg-slate-50/50 group-hover:border-t-orange-500 transition-all duration-500">
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-500 to-orange-400 -translate-x-full group-hover:translate-x-0 transition-transform duration-500 ease-out z-0" />
-            <span className="relative z-10 text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-white transition-colors duration-500">Lihat gudang</span>
-            <ArrowRight size={14} className="relative z-10 text-slate-400 group-hover:translate-x-1 group-hover:text-white transition-all duration-500" />
+          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-orange-500 bg-orange-500 transition-all duration-500">
+            <div className="relative z-10 text-[10px] font-black text-white uppercase tracking-widest flex h-4 overflow-hidden">
+              {"Lihat gudang".split('').map((char, i) => (
+                <span key={i} className="relative inline-block overflow-hidden">
+                  <span className="block transition-transform duration-500 group-hover:-translate-y-full" style={{ transitionDelay: `${i * 30}ms` }}>
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                  <span className="block absolute top-0 left-0 transition-transform duration-500 translate-y-full group-hover:translate-y-0" style={{ transitionDelay: `${i * 30}ms` }}>
+                    {char === ' ' ? '\u00A0' : char}
+                  </span>
+                </span>
+              ))}
+            </div>
+            <ArrowRight size={14} className="relative z-10 text-white group-hover:translate-x-1 transition-all duration-500" />
           </div>
         </div>
       </div>
@@ -240,21 +390,35 @@ export function DashboardView() {
           </div>
           <div className="p-4 grid grid-cols-2 gap-3">
             {topPiutang.length > 0 ? topPiutang.map((item, i) => (
-              <div key={i} className="bg-slate-100 border border-slate-200/80 rounded-xl p-4 shadow-sm flex flex-col justify-between hover:border-slate-300 transition-colors">
-                <div className="flex items-center justify-between mb-3">
+              <motion.div 
+                key={i} 
+                whileHover="hover"
+                className="bg-slate-50 border border-slate-200/60 rounded-xl p-4 shadow-sm flex flex-col justify-between hover:border-orange-300 transition-colors relative overflow-hidden group"
+              >
+                {/* Hover Gradient Effect */}
+                <motion.div
+                  variants={{
+                    hover: { x: '-10%', y: '-10%', opacity: 1, scale: 2.5 },
+                  }}
+                  initial={{ x: '-40%', y: '-40%', opacity: 0, scale: 0.5 }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 120 }}
+                  className="absolute top-0 left-0 w-48 h-48 bg-orange-500/30 blur-2xl rounded-full pointer-events-none"
+                />
+
+                <div className="flex items-center justify-between mb-3 relative z-10">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-slate-200 text-slate-700 text-xs font-black">
+                    <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-white border border-slate-200 text-slate-700 text-[10px] font-black shadow-sm group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500 transition-colors duration-300">
                       {item.customer.substring(0, 1).toUpperCase()}
                     </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.source}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-orange-600 transition-colors">{item.source}</span>
                   </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest truncate mb-1">{item.customer}</p>
-                  <p className={cn("font-black text-slate-900 tabular-nums tracking-tight", item.remains >= 1000000 ? "text-sm" : "text-base")}>{formatMoney(item.remains)}</p>
+                <div className="relative z-10">
+                  <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest truncate mb-1 group-hover:text-slate-900 transition-colors">{item.customer}</p>
+                  <p className={cn("font-black text-slate-900 tabular-nums tracking-tight transition-all group-hover:scale-105 origin-left", item.remains >= 1000000 ? "text-sm" : "text-base")}>{formatMoney(item.remains)}</p>
                 </div>
-                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-80">Belum lunas</p>
-              </div>
+                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-80 relative z-10">Belum lunas</p>
+              </motion.div>
             )) : (
               <div className="col-span-2 py-10 text-center">
                 <DollarSign size={28} className="text-slate-200 mx-auto mb-2" />
@@ -277,22 +441,36 @@ export function DashboardView() {
             </button>
           </div>
           <div className="p-4 grid grid-cols-2 gap-3">
-            {topUtang.length > 0 ? topUtang.map((item, i) => (
-              <div key={i} className="bg-slate-100 border border-slate-200/80 rounded-xl p-4 shadow-sm flex flex-col justify-between hover:border-slate-300 transition-colors">
-                <div className="flex items-center justify-between mb-3">
+             {topUtang.length > 0 ? topUtang.map((item, i) => (
+              <motion.div 
+                key={i} 
+                whileHover="hover"
+                className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 shadow-sm flex flex-col justify-between hover:border-orange-300 transition-colors relative overflow-hidden group"
+              >
+                {/* Hover Gradient Effect */}
+                <motion.div
+                  variants={{
+                    hover: { x: '-10%', y: '-10%', opacity: 1, scale: 2.5 },
+                  }}
+                  initial={{ x: '-40%', y: '-40%', opacity: 0, scale: 0.5 }}
+                  transition={{ type: 'spring', damping: 25, stiffness: 120 }}
+                  className="absolute top-0 left-0 w-48 h-48 bg-orange-500/30 blur-2xl rounded-full pointer-events-none"
+                />
+
+                <div className="flex items-center justify-between mb-3 relative z-10">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-slate-200 text-slate-700 text-xs font-black">
+                    <div className="w-7 h-7 rounded-xl flex items-center justify-center bg-white border border-slate-200 text-slate-700 text-[10px] font-black shadow-sm group-hover:bg-orange-500 group-hover:text-white group-hover:border-orange-500 transition-colors duration-300">
                       {item.customer.substring(0, 1).toUpperCase()}
                     </div>
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{item.source}</span>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest group-hover:text-orange-600 transition-colors">{item.source}</span>
                   </div>
                 </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest truncate mb-1">{item.customer}</p>
-                  <p className={cn("font-black text-slate-900 tabular-nums tracking-tight", item.remains >= 1000000 ? "text-sm" : "text-base")}>{formatMoney(item.remains)}</p>
+                <div className="relative z-10">
+                  <p className="text-[10px] font-black text-slate-700 uppercase tracking-widest truncate mb-1 group-hover:text-slate-900 transition-colors">{item.customer}</p>
+                  <p className={cn("font-black text-slate-900 tabular-nums tracking-tight transition-all group-hover:scale-105 origin-left", item.remains >= 1000000 ? "text-sm" : "text-base")}>{formatMoney(item.remains)}</p>
                 </div>
-                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-80">Kewajiban bayar</p>
-              </div>
+                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-80 relative z-10">Kewajiban bayar</p>
+              </motion.div>
             )) : (
               <div className="col-span-2 py-10 text-center">
                 <History size={28} className="text-slate-200 mx-auto mb-2" />
@@ -370,7 +548,7 @@ export function DashboardView() {
                   {/* Pelanggan */}
                   <div className="col-span-2">
                     <p className="text-xs font-black text-slate-900 uppercase tracking-tight truncate">
-                      {(act.nama_mitra || act.keterangan?.replace('Mitra: ', '') || 'Umum').split('|')[0].trim()}
+                      {(act.mitra_name || act.nama_mitra || act.keterangan?.replace('Mitra: ', '') || 'Umum').split('|')[0].trim()}
                     </p>
                   </div>
 
@@ -402,10 +580,11 @@ export function DashboardView() {
               );
             })
           ) : (
-            <div className="flex flex-col items-center justify-center py-16">
-              <Clock size={32} className="text-slate-200 mb-3" />
-              <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Belum ada aktivitas tercatat</p>
-            </div>
+            <EmptyState 
+              icon={Clock} 
+              title="Belum ada aktivitas" 
+              description="Semua transaksi terbaru Anda akan muncul di sini." 
+            />
           )}
         </div>
 

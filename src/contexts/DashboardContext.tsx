@@ -34,6 +34,7 @@ interface DashboardContextType {
   financialData: any;
   dashboardStats: any;
   recentCombinedActivities: any[];
+  isSandbox: boolean;
   
   // Modals & Forms (Shared)
   mitraName: string;
@@ -174,6 +175,7 @@ const DashboardContext = createContext<DashboardContextType | undefined>(undefin
 
 export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const { user, userRole, supabase } = useAuth();
+  const isSandbox = !!localStorage.getItem('mbf_sandbox_user');
   const [activeTab, setActiveTab] = useState('Beranda');
   const [notification, setNotification] = useState({ show: false, message: '', type: 'success' as 'success' | 'error' });
 
@@ -268,7 +270,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [afkirMitra, setAfkirMitra] = useState<string>('');
   const [isSubmittingAfkir, setIsSubmittingAfkir] = useState(false);
 
-  // Data Hooks
   const {
     isLoading: isDataLoading,
     feedItems,
@@ -282,7 +283,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     fetchEggTransactions,
     fetchFeedTransactions,
     fetchAfkirTransactions,
-    fetchPaymentHistory
+    fetchPaymentHistory,
+    setEggTransactions,
+    setFeedTransactions
   } = useSupabaseData(supabase);
 
   const {
@@ -312,6 +315,16 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsSubmittingEggs(true);
     
+    if (isSandbox) {
+      setTimeout(() => {
+        showToast('Berhasil mencatat transaksi (Mode Trial)', 'success');
+        setEggModalType(null);
+        setEggNotes('');
+        setIsSubmittingEggs(false);
+      }, 800);
+      return;
+    }
+
     const jenis = eggModalType === 'terima' ? 'Beli Telur' : 'Jual Telur';
     const total_kg = eggIkat * 15;
     
@@ -322,8 +335,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
           .insert([{
             tanggal: eggDate,
             jenis_transaksi: jenis,
-            // Column 'jenis_telur' and 'nama_mitra' do not exist in the schema, 
-            // so we include them in the keterangan field for now.
             keterangan: `Mitra: ${mitraName} | Jenis: ${eggType}${eggNotes ? ` | Ket: ${eggNotes}` : ''}`,
             jumlah_kg: total_kg,
             harga_per_kg: eggPrice,
@@ -338,12 +349,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         showToast(`Berhasil mencatat ${eggModalType === 'terima' ? 'pembelian' : 'penjualan'} telur`);
         setEggModalType(null);
         setEggNotes('');
-      } else {
-        // Fallback for demo without DB
-        setTimeout(() => {
-          showToast(`Berhasil mencatat ${eggModalType === 'terima' ? 'setoran' : 'penjualan'} telur (Demo)`);
-          setEggModalType(null);
-        }, 1000);
       }
     } catch (err: any) {
       console.error('Error submitting egg transaction:', err);
@@ -353,7 +358,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [
     mitraName, eggIkat, eggModalType, eggPrice, eggDate, eggType, eggNotes,
-    fetchEggTransactions, fetchEggStock, showToast, supabase
+    fetchEggTransactions, fetchEggStock, showToast, supabase, isSandbox
   ]);
 
   const addFeedCartRow = useCallback(() => {
@@ -387,11 +392,22 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsSubmittingFeed(true);
 
+    if (isSandbox) {
+      setTimeout(() => {
+        showToast('Berhasil mencatat pakan (Mode Trial)', 'success');
+        setFeedModalType(null);
+        setMitraName('');
+        setFeedNotes('');
+        setFeedCart([{ id_bahan: '', qty: 0, harga_per_satuan: 0 }]);
+        setIsSubmittingFeed(false);
+      }, 800);
+      return;
+    }
+
     const jenis = feedModalType === 'beli' ? 'Beli Pakan' : 'Jual Pakan';
     
     try {
       if (supabase) {
-        // 1. Insert header — matches actual transaksi_pakan schema
         const { data: insertedHeaders, error: headerError } = await supabase
           .from('transaksi_pakan')
           .insert([{
@@ -408,7 +424,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         if (!insertedHeaders || insertedHeaders.length === 0) throw new Error('Header insert returned empty');
         const header = insertedHeaders[0];
 
-        // 2. Insert details — matches actual detail_transaksi_pakan schema
         const details = feedCart.map(item => ({
           transaksi_pakan_id: header.id,
           bahan_id: item.id_bahan,
@@ -423,7 +438,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
 
         if (detailError) throw detailError;
 
-        // 3. Update stock in master_pakan
         for (const item of feedCart) {
           const currentItem = feedItems.find(f => String(f.id) === String(item.id_bahan));
           if (currentItem) {
@@ -445,11 +459,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         setMitraName('');
         setFeedNotes('');
         setFeedCart([{ id_bahan: '', qty: 0, harga_per_satuan: 0 }]);
-      } else {
-        setTimeout(() => {
-          showToast(`Berhasil mencatat ${feedModalType === 'beli' ? 'pembelian' : 'penjualan'} pakan (Demo)`);
-          setFeedModalType(null);
-        }, 1000);
       }
     } catch (err: any) {
       console.error('Error submitting feed transaction:', err);
@@ -457,7 +466,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsSubmittingFeed(false);
     }
-  }, [mitraName, feedCart, feedModalType, feedDate, feedCartTotal, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, supabase]);
+  }, [mitraName, feedCart, feedModalType, feedDate, feedCartTotal, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, supabase, isSandbox]);
 
 
   const handleSubmitAfkir = useCallback(async () => {
@@ -466,6 +475,20 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     setIsSubmittingAfkir(true);
+
+    if (isSandbox) {
+      setTimeout(() => {
+        showToast('Berhasil mencatat afkir (Mode Trial)', 'success');
+        setIsAfkirModalOpen(false);
+        setAfkirNotes('');
+        setAfkirQty(0);
+        setAfkirPrice(0);
+        setAfkirMitra('');
+        setIsSubmittingAfkir(false);
+      }, 800);
+      return;
+    }
+
     try {
       if (supabase) {
         const totalHarga = afkirQty * afkirPrice;
@@ -475,11 +498,11 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
             tanggal: afkirDate,
             mitra_name: afkirMitra,
             qty_ekor: afkirQty,
-            berat_total_kg: 0, // No longer used in UI
+            berat_total_kg: 0,
             harga_per_satuan: afkirPrice,
             total_harga: totalHarga,
             keterangan: afkirNotes,
-            jumlah_dibayar: totalHarga, // Asumsi bayar tunai
+            jumlah_dibayar: totalHarga
           }]);
 
         if (error) throw error;
@@ -497,7 +520,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsSubmittingAfkir(false);
     }
-  }, [afkirQty, afkirMitra, afkirPrice, afkirDate, afkirNotes, supabase, fetchAfkirTransactions, showToast, setIsAfkirModalOpen]);
+  }, [afkirQty, afkirMitra, afkirPrice, afkirDate, afkirNotes, supabase, fetchAfkirTransactions, showToast, setIsAfkirModalOpen, isSandbox]);
 
   const formatMoney = useCallback((amount: number, short: boolean = false) => {
     if (short && amount >= 1000000) {
@@ -508,79 +531,167 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const handleDeleteEggTransaction = useCallback(async (id: string) => {
+    if (userRole === 'viewer') {
+      showToast('Anda tidak memiliki akses untuk menghapus data', 'error');
+      return;
+    }
+
     showConfirm(
       'Hapus Transaksi?',
-      'Transaksi ini akan dihapus permanen dari database.',
+      'Transaksi ini akan dihapus permanen beserta riwayat pembayarannya.',
       async () => {
         try {
-          if (supabase) {
-            const { error } = await supabase.from('transaksi_telur').delete().eq('id', id);
-            if (error) throw error;
-            await fetchEggTransactions();
-            await fetchEggStock();
-            showToast('Transaksi telur berhasil dihapus');
+          if (isSandbox) {
+            setEggTransactions(prev => prev.filter(t => t.id !== id));
+            showToast('Penghapusan berhasil (Mode Trial)', 'success');
+            return;
           }
-        } catch (err) {
+
+          if (!supabase) {
+            showToast('Koneksi database tidak tersedia', 'error');
+            return;
+          }
+
+          // 1. Delete payment logs first (foreign key)
+          const { error: logErr } = await supabase.from('log_pembayaran').delete().eq('transaksi_id', id);
+          if (logErr) console.warn('log_pembayaran delete warning:', logErr.message);
+
+          // 2. Delete the transaction and verify with .select()
+          const { data: deleted, error } = await supabase
+            .from('transaksi_telur')
+            .delete()
+            .eq('id', id)
+            .select();
+
+          if (error) {
+            console.error('Supabase DELETE error:', error);
+            showToast(`Gagal hapus: ${error.message}`, 'error');
+            return;
+          }
+
+          // 3. Check if RLS silently blocked the delete
+          if (!deleted || deleted.length === 0) {
+            console.error('DELETE returned 0 rows — likely blocked by RLS policy');
+            showToast('Gagal hapus: akses ditolak oleh database (RLS). Hubungi admin.', 'error');
+            return;
+          }
+
+          // 4. Success — now refresh data from database
+          await fetchEggTransactions();
+          await fetchEggStock();
+          showToast('Transaksi telur berhasil dihapus');
+        } catch (err: any) {
           console.error('Error deleting egg trx:', err);
-          showToast('Gagal menghapus transaksi', 'error');
+          showToast(`Gagal menghapus: ${err?.message || 'Unknown error'}`, 'error');
+          await fetchEggTransactions();
         }
       }
     );
-  }, [supabase, fetchEggTransactions, fetchEggStock, showToast, showConfirm]);
+  }, [supabase, fetchEggTransactions, fetchEggStock, showToast, showConfirm, isSandbox, userRole, setEggTransactions]);
 
   const handleDeleteFeedTransaction = useCallback(async (id: string) => {
+    if (userRole === 'viewer') {
+      showToast('Anda tidak memiliki akses untuk menghapus data', 'error');
+      return;
+    }
+
     showConfirm(
       'Hapus Transaksi Pakan?',
-      'Stok pakan akan otomatis dikembalikan ke gudang.',
+      'Stok pakan akan dikembalikan dan riwayat pembayaran akan dihapus.',
       async () => {
         try {
-          if (supabase) {
-            // Get details first to revert stock
-            const { data: details, error: detErr } = await supabase
-              .from('detail_transaksi_pakan')
-              .select('*')
-              .eq('transaksi_pakan_id', id);
-            
-            if (detErr) throw detErr;
+          if (isSandbox) {
+            setFeedTransactions(prev => prev.filter(t => t.id !== id));
+            showToast('Penghapusan berhasil (Mode Trial)', 'success');
+            return;
+          }
 
-            const { data: trxHeader } = await supabase.from('transaksi_pakan').select('jenis_transaksi').eq('id', id).single();
+          if (!supabase) {
+            showToast('Koneksi database tidak tersedia', 'error');
+            return;
+          }
 
-            // Revert stock
-            if (details && trxHeader) {
-              for (const item of details) {
-                const currentItem = feedItems.find(f => String(f.id) === String(item.bahan_id));
-                if (currentItem) {
-                  const newStock = trxHeader.jenis_transaksi === 'Beli Pakan'
-                    ? currentItem.stok_sekarang - item.qty
-                    : currentItem.stok_sekarang + item.qty;
-                  
-                  await supabase.from('master_pakan').update({ stok_sekarang: newStock }).eq('id', item.bahan_id);
-                }
+          // 1. Reverse stock changes
+          const { data: details, error: detErr } = await supabase
+            .from('detail_transaksi_pakan')
+            .select('*')
+            .eq('transaksi_pakan_id', id);
+          
+          if (detErr) console.warn('detail fetch warning:', detErr.message);
+
+          const { data: trxHeader } = await supabase
+            .from('transaksi_pakan')
+            .select('jenis_transaksi')
+            .eq('id', id)
+            .single();
+
+          if (details && trxHeader) {
+            for (const item of details) {
+              const currentItem = feedItems.find(f => String(f.id) === String(item.bahan_id));
+              if (currentItem) {
+                const newStock = trxHeader.jenis_transaksi === 'Beli Pakan'
+                  ? currentItem.stok_sekarang - item.qty
+                  : currentItem.stok_sekarang + item.qty;
+                
+                await supabase.from('master_pakan').update({ stok_sekarang: newStock }).eq('id', item.bahan_id);
               }
             }
-
-            // Delete details and header
-            await supabase.from('detail_transaksi_pakan').delete().eq('transaksi_pakan_id', id);
-            const { error } = await supabase.from('transaksi_pakan').delete().eq('id', id);
-            
-            if (error) throw error;
-            await fetchFeedTransactions();
-            await fetchFeedMaster();
-            showToast('Transaksi pakan berhasil dihapus');
           }
-        } catch (err) {
+
+          // 2. Delete related records first (foreign keys)
+          const { error: logErr } = await supabase.from('log_pembayaran').delete().eq('transaksi_id', id);
+          if (logErr) console.warn('log_pembayaran delete warning:', logErr.message);
+
+          await supabase.from('detail_transaksi_pakan').delete().eq('transaksi_pakan_id', id);
+
+          // 3. Delete main transaction and verify
+          const { data: deleted, error } = await supabase
+            .from('transaksi_pakan')
+            .delete()
+            .eq('id', id)
+            .select();
+
+          if (error) {
+            console.error('Supabase DELETE error:', error);
+            showToast(`Gagal hapus: ${error.message}`, 'error');
+            return;
+          }
+
+          if (!deleted || deleted.length === 0) {
+            console.error('DELETE returned 0 rows — likely blocked by RLS policy');
+            showToast('Gagal hapus: akses ditolak oleh database (RLS). Hubungi admin.', 'error');
+            return;
+          }
+
+          // 4. Success — refresh all data
+          await fetchFeedTransactions();
+          await fetchFeedMaster();
+          showToast('Transaksi pakan berhasil dihapus');
+        } catch (err: any) {
           console.error('Error deleting feed trx:', err);
-          showToast('Gagal menghapus transaksi', 'error');
+          showToast(`Gagal menghapus: ${err?.message || 'Unknown error'}`, 'error');
+          await fetchFeedTransactions();
         }
       }
     );
-  }, [supabase, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, showConfirm]);
+  }, [supabase, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, showConfirm, isSandbox, userRole, setFeedTransactions]);
 
   const handleSubmitPayment = useCallback(async () => {
     if (paymentAmount <= 0) {
       showAlert('Nominal Tidak Valid', 'Nominal pembayaran harus lebih dari Rp 0.');
       return;
     }
+
+    if (isSandbox) {
+      setIsSubmittingPayment(true);
+      setTimeout(() => {
+        showToast('Pembayaran berhasil (Mode Trial)', 'success');
+        setInvoiceModalMode(null);
+        setIsSubmittingPayment(false);
+      }, 800);
+      return;
+    }
+
     if (!selectedInvoice || !supabase) {
       showAlert('Error', 'Data invoice atau koneksi database tidak tersedia.');
       return;
@@ -588,7 +699,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
 
     setIsSubmittingPayment(true);
     try {
-      // 1. Insert log payment
       const { error: logError } = await supabase
         .from('log_pembayaran')
         .insert([{
@@ -599,9 +709,10 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
           created_at: new Date().toISOString()
         }]);
 
-      if (logError) throw logError;
+      if (logError) {
+        console.warn('log_pembayaran not available, skipping log but updating balance:', logError.message);
+      }
 
-      // 2. Update parent transaction total paid
       const currentPaid = selectedInvoice.jumlah_dibayar ?? selectedInvoice.dibayar_hari_ini ?? 0;
       const newTotalPaid = currentPaid + paymentAmount;
 
@@ -619,14 +730,12 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         if (updError) throw updError;
       }
 
-      // 3. Refresh all data
       await Promise.all([
         fetchEggTransactions(),
         fetchFeedTransactions(),
         fetchPaymentHistory(selectedInvoice.id)
       ]);
 
-      // 4. Update local detail states if they match the current invoice
       if (selectedEggDetail && selectedEggDetail.id === selectedInvoice.id) {
         setSelectedEggDetail((prev: any) => ({ ...prev, [billingMode === 'telur' ? 'jumlah_dibayar' : 'dibayar_hari_ini']: newTotalPaid }));
       }
@@ -650,7 +759,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     formatMoney, showAlert, setInvoiceModalMode
   ]);
 
-  // Initial Fetch
   useEffect(() => {
     if (supabase) {
       fetchFeedMaster();
@@ -661,7 +769,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [supabase, fetchFeedMaster, fetchEggStock, fetchEggTransactions, fetchFeedTransactions, fetchAfkirTransactions]);
 
-  // Refresh stock on modal open
   useEffect(() => {
     if (eggModalType || feedModalType) {
       fetchEggStock();
@@ -669,7 +776,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [eggModalType, feedModalType, fetchEggStock, fetchFeedMaster]);
 
-  // Fetch payment history when detail modals open
   useEffect(() => {
     if (isEggDetailOpen && selectedEggDetail?.id) {
       fetchPaymentHistory(selectedEggDetail.id);
@@ -708,6 +814,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     financialData,
     dashboardStats,
     recentCombinedActivities,
+    isSandbox,
     mitraName,
     setMitraName,
     eggModalType,
@@ -789,8 +896,6 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setFeedDate,
     billingMode,
     setBillingMode,
-    billingSubMode,
-    setBillingSubMode,
     billingSubMode,
     setBillingSubMode,
     afkirTransactions,

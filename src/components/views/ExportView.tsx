@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SectionContainer } from '../layout/SectionContainer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 import logoMBF from '../../assets/logo_MBF.png';
 import logoBEF from '../../assets/logo_BEF.png';
@@ -23,16 +24,18 @@ import { useDashboard } from '../../contexts/DashboardContext';
 export function ExportView() {
   const { eggTransactions, feedTransactions, afkirTransactions, formatMoney, showToast } = useDashboard();
   
-  const RECENT_EXPORTS = [
-    { name: 'Laporan Penjualan April 2026', period: 'Apr 2026', user: 'Bu Latifun', date: '28 Apr 2026', format: 'PDF' },
-    { name: 'Laporan Piutang April 2026', period: 'Apr 2026', user: 'Bu Latifun', date: '28 Apr 2026', format: 'Excel' },
-    { name: 'Laporan Stok Pakan Mar 2026', period: 'Mar 2026', user: 'Bu Latifun', date: '1 Apr 2026', format: 'PDF' },
-    { name: 'Laporan Penjualan Mar 2026', period: 'Mar 2026', user: 'Bu Latifun', date: '1 Apr 2026', format: 'Excel' },
-    { name: 'Laporan Piutang Feb 2026', period: 'Feb 2026', user: 'Bu Latifun', date: '3 Mar 2026', format: 'PDF' },
-    { name: 'Laporan Stok Pakan Feb 2026', period: 'Feb 2026', user: 'Bu Latifun', date: '3 Mar 2026', format: 'Excel' },
-  ];
+  const RECENT_EXPORTS: any[] = [];
   const [reportType, setReportType] = useState('Laporan Penjualan Telur');
   const [selectedEntity, setSelectedEntity] = useState<'MBF' | 'BEF'>('MBF');
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+
+  const getMonthStr = (dateStr: string) => dateStr ? new Date(dateStr).toISOString().substring(0, 7) : '';
+  const filteredEgg = eggTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
+  const filteredFeed = feedTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
+  const filteredAfkir = afkirTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
   const printRefLaporan = useRef<HTMLDivElement>(null);
   const handlePrintLaporan = useReactToPrint({ contentRef: printRefLaporan });
 
@@ -90,28 +93,9 @@ export function ExportView() {
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unduh laporan operasional dan finansial untuk arsip</p>
         </div>
         
-        <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
-          <button
-            onClick={() => setSelectedEntity('MBF')}
-            className={cn(
-              "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-              selectedEntity === 'MBF' ? "bg-white text-slate-900 shadow-md" : "text-slate-400 hover:text-slate-600"
-            )}
-          >
-            PT MBF
-          </button>
-          <button
-            onClick={() => setSelectedEntity('BEF')}
-            className={cn(
-              "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-              selectedEntity === 'BEF' ? "bg-white text-slate-900 shadow-md" : "text-slate-400 hover:text-slate-600"
-            )}
-          >
-            CV BEF
-          </button>
-        </div>
 
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Terakhir diekspor: 28 Apr 2026</p>
+
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Terakhir diekspor: -</p>
       </div>
 
       {/* Financial Report Entity Selection */}
@@ -131,16 +115,10 @@ export function ExportView() {
           },
         ].map((card, i) => (
           <Card key={i} className="border-slate-200/60 shadow-sm group hover:border-orange-200/50 transition-all flex flex-col relative overflow-hidden">
-              <div className={cn(
-                "absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-[0.03] transition-transform group-hover:scale-150",
-                card.entity === 'MBF' ? "bg-slate-900" : "bg-orange-600"
-              )} />
+              <div className="absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-[0.03] transition-transform group-hover:scale-150 bg-orange-600" />
               
               <CardHeader className="p-8 pb-4">
-                <div className={cn(
-                  "w-12 h-12 rounded-xl flex items-center justify-center transition-all mb-6 shadow-sm",
-                  card.entity === 'MBF' ? "bg-slate-900 text-white" : "bg-orange-500 text-white"
-                )}>
+                <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all mb-6 shadow-sm bg-orange-500 text-white">
                     <card.icon size={24} />
                 </div>
                 <CardTitle className="text-lg font-black text-slate-900 uppercase tracking-tight">{card.title}</CardTitle>
@@ -149,16 +127,31 @@ export function ExportView() {
               
               <CardContent className="p-8 pt-4 space-y-6 mt-auto">
                 <div className="flex items-center gap-4">
-                    <div className="flex-1 flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                      <Calendar size={14} className="text-slate-400" />
-                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-tight">
-                        {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
-                      </span>
+                    <div 
+                      className="flex-1 flex items-center gap-2 p-2.5 bg-slate-100 hover:bg-slate-200 transition-colors rounded-xl border border-slate-200 relative cursor-pointer group"
+                      onClick={() => {
+                        const input = document.getElementById(`month-picker-${i}`);
+                        if (input && 'showPicker' in input) {
+                          try { (input as any).showPicker(); } catch (e) {}
+                        }
+                      }}
+                    >
+                      <Calendar size={14} className="text-slate-500 group-hover:text-slate-700 transition-colors" />
+                      <input 
+                        id={`month-picker-${i}`}
+                        type="month" 
+                        value={selectedMonth}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if ('showPicker' in e.currentTarget) {
+                            try { (e.currentTarget as any).showPicker(); } catch (e) {}
+                          }
+                        }}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        className="bg-transparent border-none text-[11px] font-black text-slate-700 uppercase tracking-widest focus:ring-0 outline-none p-0 w-full cursor-pointer h-full"
+                      />
                     </div>
-                    <Badge className={cn(
-                      "text-[9px] font-black uppercase px-2 py-1 rounded-lg border-none shadow-none",
-                      card.entity === 'MBF' ? "bg-slate-100 text-slate-900" : "bg-orange-50 text-orange-600"
-                    )}>
+                    <Badge className="text-[9px] font-black uppercase px-2 py-1 rounded-lg border-none shadow-none bg-orange-50 text-orange-600">
                       FULL REKAP
                     </Badge>
                 </div>
@@ -170,21 +163,22 @@ export function ExportView() {
                         setReportType(card.title);
                         setTimeout(() => handlePrintLaporan(), 100);
                       }}
-                      className={cn(
-                        "h-11 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95",
-                        card.entity === 'MBF' ? "bg-slate-900 text-white shadow-slate-900/10" : "bg-orange-600 text-white shadow-orange-600/10"
-                      )}
+                      className="h-11 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95 bg-orange-600 text-white shadow-orange-600/10"
                     >
                       <Printer size={14} className="mr-2" />
                       PDF REPORT
                     </Button>
                     <Button 
-                      onClick={() => handleExportCSV('telur')}
+                      onClick={() => {
+                        setSelectedEntity(card.entity);
+                        setReportType(card.title);
+                        setTimeout(() => document.getElementById('print-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                      }}
                       variant="outline"
                       className="h-11 text-[10px] font-black uppercase tracking-widest rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50"
                     >
-                      <Download size={14} className="mr-2" />
-                      CSV DATA
+                      <FileText size={14} className="mr-2" />
+                      PREVIEW
                     </Button>
                 </div>
               </CardContent>
@@ -204,31 +198,25 @@ export function ExportView() {
         </CardHeader>
         <CardContent className="p-12 bg-slate-100/50 flex flex-col items-center">
             {/* A4 Paper Preview */}
-            <div ref={printRefLaporan} className="bg-white w-full max-w-[800px] min-h-[1100px] shadow-2xl shadow-slate-200 p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200">
+            <div id="print-preview" ref={printRefLaporan} className="bg-white w-full max-w-[800px] min-h-[1100px] shadow-2xl shadow-slate-200 p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200">
               {/* Official Letterhead */}
               <div className="flex items-center justify-between border-b-[3px] border-slate-900 pb-8">
-                  <div className="flex items-center gap-6">
+                  <div className="flex gap-6 items-center">
                     <img 
                       src={selectedEntity === 'MBF' ? logoMBF : logoBEF} 
                       alt="Logo" 
-                      className="h-20 w-auto object-contain" 
+                      className="w-20 h-20 object-contain" 
                     />
-                    <div className="h-16 w-[2px] bg-slate-200" />
-                    <div className="flex flex-col">
-                      <h1 className="text-3xl font-black tracking-tighter text-slate-900">
-                        {selectedEntity === 'MBF' ? 'PT MITRA BAROKAH FARM' : 'CV BAROKAH EKA FARM'}
+                    <div>
+                      <h1 className="text-3xl font-black tracking-tighter text-slate-900 uppercase">
+                        {selectedEntity === 'MBF' ? 'PT. MITRA BAROKAH FARM' : 'CV BERKAH EGG FARM'}
                       </h1>
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Livestock & Feed Management System</p>
-                      <div className="mt-2 space-y-0.5">
-                        <p className="text-[9px] font-bold text-slate-500 uppercase">
-                          {selectedEntity === 'MBF' 
-                            ? 'Jl. Raya Tulungagung - Trenggalek No. 45' 
-                            : 'Dusun Krajan, Desa Bendorejo, Pogalan'}
-                        </p>
-                        <p className="text-[9px] font-bold text-slate-500 uppercase">
-                          Email: admin@{selectedEntity === 'MBF' ? 'barokahfarm.id' : 'ekafarm.id'} | Telp: (0355) 321xxx
-                        </p>
-                      </div>
+                      <p className="text-[12px] font-black text-slate-900 uppercase tracking-widest leading-tight mt-1.5">
+                        {selectedEntity === 'MBF' 
+                          ? 'Divisi Distribusi Pakan Ternak' 
+                          : 'Pengepul & Supplier Telur Ayam'}
+                        <br/>Tulungagung, Jawa Timur
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1.5">
@@ -238,7 +226,7 @@ export function ExportView() {
                     <div className="flex flex-col items-end">
                       <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Periode Laporan</p>
                       <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight mt-0.5">
-                        {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                        {new Date(selectedMonth + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
                       </p>
                     </div>
                     <div className="flex flex-col items-end mt-1">
@@ -254,19 +242,19 @@ export function ExportView() {
               <div className="grid grid-cols-3 gap-6">
                 {[
                     { label: 'Total Pemasukan', val: formatMoney(
-                      eggTransactions.reduce((s, t) => s + (t.total_harga || 0), 0) + 
-                      feedTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) +
-                      afkirTransactions.reduce((s, t) => s + (t.total_harga || 0), 0)
+                      filteredEgg.reduce((s, t) => s + (t.total_harga || 0), 0) + 
+                      filteredFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) +
+                      filteredAfkir.reduce((s, t) => s + (t.total_harga || 0), 0)
                       , false) 
                     },
                     { label: 'Total Pengeluaran', val: formatMoney(
-                      feedTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + 
-                      eggTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0)
+                      filteredFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + 
+                      filteredEgg.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0)
                       , false) 
                     },
                     { label: 'Selisih Bersih', val: formatMoney(
-                      (eggTransactions.reduce((s, t) => s + (t.total_harga || 0), 0) + feedTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + afkirTransactions.reduce((s, t) => s + (t.total_harga || 0), 0)) - 
-                      (feedTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + eggTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0))
+                      (filteredEgg.reduce((s, t) => s + (t.total_harga || 0), 0) + filteredFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + filteredAfkir.reduce((s, t) => s + (t.total_harga || 0), 0)) - 
+                      (filteredFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + filteredEgg.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0))
                       , false) 
                     },
                 ].map((s, i) => (
@@ -289,24 +277,41 @@ export function ExportView() {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {[...eggTransactions, ...feedTransactions, ...afkirTransactions].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).slice(0, 30).map((t, i) => {
-                          const isAfkir = !t.jenis_transaksi && t.mitra_name; // Simple check for afkir object structure
-                          const isIncome = isAfkir || t.jenis_transaksi?.toLowerCase().includes('jual') || t.jenis_transaksi?.toLowerCase().includes('keluar') || (t.total_harga && !t.jenis_transaksi?.toLowerCase().includes('beli'));
-                          const amount = t.total_harga || t.total_tagihan || 0;
-                          const customer = (t.mitra_name || t.nama_mitra || t.keterangan?.replace('Mitra: ', '') || 'Umum').split('|')[0].trim();
-                          const description = isAfkir ? 'Penjualan Ayam Afkir' : (t.jenis_transaksi || 'Penjualan Telur');
-                          
-                          return (
-                            <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
-                                <TableCell className="py-3 text-[10px] font-bold text-slate-400">{new Date(t.tanggal).toLocaleDateString('id-ID', {day: '2-digit', month: '2-digit'})}</TableCell>
-                                <TableCell className="py-3 text-left text-[11px] font-black uppercase text-slate-900">
-                                  {description} - {customer}
+                        {(() => {
+                          const combined = [...filteredEgg, ...filteredFeed, ...filteredAfkir];
+                          if (combined.length === 0) {
+                            return (
+                              <TableRow>
+                                <TableCell colSpan={4}>
+                                  <EmptyState 
+                                    icon={FileText} 
+                                    title="Laporan Kosong" 
+                                    description="Tidak ada aktivitas finansial yang tercatat untuk periode ini." 
+                                  />
                                 </TableCell>
-                                <TableCell className="py-3 text-right text-[11px] font-black text-blue-600 tabular-nums">{!isIncome ? formatMoney(amount, false) : '-'}</TableCell>
-                                <TableCell className="py-3 text-right pr-4 text-[11px] font-black text-emerald-600 tabular-nums">{isIncome ? formatMoney(amount, false) : '-'}</TableCell>
-                            </TableRow>
-                          );
-                        })}
+                              </TableRow>
+                            );
+                          }
+
+                          return combined.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).slice(0, 30).map((t, i) => {
+                            const isAfkir = !t.jenis_transaksi && t.mitra_name; 
+                            const isIncome = isAfkir || t.jenis_transaksi?.toLowerCase().includes('jual') || t.jenis_transaksi?.toLowerCase().includes('keluar') || (t.total_harga && !t.jenis_transaksi?.toLowerCase().includes('beli'));
+                            const amount = t.total_harga || t.total_tagihan || 0;
+                            const customer = (t.mitra_name || t.nama_mitra || t.keterangan?.replace('Mitra: ', '') || 'Umum').split('|')[0].trim();
+                            const description = isAfkir ? 'Penjualan Ayam Afkir' : (t.jenis_transaksi || 'Penjualan Telur');
+                            
+                            return (
+                              <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
+                                  <TableCell className="py-3 text-[10px] font-bold text-slate-400">{new Date(t.tanggal).toLocaleDateString('id-ID', {day: '2-digit', month: '2-digit'})}</TableCell>
+                                  <TableCell className="py-3 text-left text-[11px] font-black uppercase text-slate-900">
+                                    {description} - {customer}
+                                  </TableCell>
+                                  <TableCell className="py-3 text-right text-[11px] font-black text-blue-600 tabular-nums">{!isIncome ? formatMoney(amount, false) : '-'}</TableCell>
+                                  <TableCell className="py-3 text-right pr-4 text-[11px] font-black text-emerald-600 tabular-nums">{isIncome ? formatMoney(amount, false) : '-'}</TableCell>
+                              </TableRow>
+                            );
+                          });
+                        })()}
                     </TableBody>
                   </Table>
               </div>
@@ -371,28 +376,40 @@ export function ExportView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {RECENT_EXPORTS.map((exp, i) => (
-                <TableRow key={i} className="group hover:bg-slate-50 transition-colors border-slate-50">
-                  <TableCell className="py-4 pl-8 text-xs font-black text-slate-800 tracking-tight uppercase">{exp.name}</TableCell>
-                  <TableCell className="py-4 text-xs font-bold text-slate-500">{exp.period}</TableCell>
-                  <TableCell className="py-4 text-xs font-black text-slate-900 uppercase">{exp.user}</TableCell>
-                  <TableCell className="py-4 text-xs font-bold text-slate-400">{exp.date}</TableCell>
-                  <TableCell className="py-4">
-                      <Badge className={cn(
-                        "text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border-none shadow-none",
-                        exp.format === 'PDF' ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
-                      )}>
-                        {exp.format}
-                      </Badge>
-                  </TableCell>
-                  <TableCell className="py-4 pr-8 text-center">
-                      <Button variant="ghost" size="sm" className="h-8 gap-2 text-[10px] font-black text-slate-400 hover:text-orange-600 uppercase tracking-widest group">
-                        <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
-                        Download
-                      </Button>
+              {RECENT_EXPORTS.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="p-0">
+                    <EmptyState 
+                      icon={FileText} 
+                      title="Belum Ada Riwayat" 
+                      description="Riwayat ekspor laporan akan muncul di sini setelah Anda melakukan ekspor data." 
+                    />
                   </TableCell>
                 </TableRow>
-              ))}
+              ) : (
+                RECENT_EXPORTS.map((exp, i) => (
+                  <TableRow key={i} className="group hover:bg-slate-50 transition-colors border-slate-50">
+                    <TableCell className="py-4 pl-8 text-xs font-black text-slate-800 tracking-tight uppercase">{exp.name}</TableCell>
+                    <TableCell className="py-4 text-xs font-bold text-slate-500">{exp.period}</TableCell>
+                    <TableCell className="py-4 text-xs font-black text-slate-900 uppercase">{exp.user}</TableCell>
+                    <TableCell className="py-4 text-xs font-bold text-slate-400">{exp.date}</TableCell>
+                    <TableCell className="py-4">
+                        <Badge className={cn(
+                          "text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border-none shadow-none",
+                          exp.format === 'PDF' ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
+                        )}>
+                          {exp.format}
+                        </Badge>
+                    </TableCell>
+                    <TableCell className="py-4 pr-8 text-center">
+                        <Button variant="ghost" size="sm" className="h-8 gap-2 text-[10px] font-black text-slate-400 hover:text-orange-600 uppercase tracking-widest group">
+                          <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
+                          Download
+                        </Button>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </CardContent>

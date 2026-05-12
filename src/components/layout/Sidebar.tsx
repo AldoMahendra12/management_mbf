@@ -21,6 +21,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: { isCollapsed: boolean,
   const { activeTab, setActiveTab, supabase, user, userRole } = useDashboard();
   const sidebarLogoContainerRef = useRef<HTMLDivElement>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const [isLogoHovered, setIsLogoHovered] = useState(false);
 
   useEffect(() => {
     if (!sidebarLogoContainerRef.current) return;
@@ -35,8 +36,14 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: { isCollapsed: boolean,
       paused: true
     });
 
-    const handleEnter = () => hoverTl.play();
-    const handleLeave = () => hoverTl.reverse();
+    const handleEnter = () => {
+      hoverTl.play();
+      setIsLogoHovered(true);
+    };
+    const handleLeave = () => {
+      hoverTl.reverse();
+      setIsLogoHovered(false);
+    };
 
     const container = sidebarLogoContainerRef.current;
     container.addEventListener('mouseenter', handleEnter);
@@ -96,8 +103,17 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: { isCollapsed: boolean,
             "flex flex-col whitespace-nowrap pl-3 overflow-hidden transition-all duration-500",
             isCollapsed ? "w-0" : "w-[150px]"
           )}>
-            <span className="text-sm font-bold text-slate-900 tracking-tight leading-none">MBF Management</span>
-            <span className="text-[11px] font-medium text-orange-600 mt-0.5">Pusat Administrasi</span>
+            <div className="relative h-[14px] w-full overflow-hidden">
+              <span className={cn(
+                "absolute inset-0 text-sm font-bold text-slate-900 tracking-tight leading-none transition-transform duration-500",
+                isLogoHovered ? "-translate-y-full" : "translate-y-0"
+              )}>MBF Management</span>
+              <span className={cn(
+                "absolute inset-0 text-sm font-bold text-slate-900 tracking-tight leading-none transition-transform duration-500",
+                isLogoHovered ? "translate-y-0" : "translate-y-full"
+              )}>BEF Management</span>
+            </div>
+            <span className="text-[11px] font-medium text-orange-600 mt-0.5 transition-all duration-500">Pusat Administrasi</span>
           </div>
         </div>
         
@@ -169,10 +185,21 @@ export function Sidebar({ isCollapsed, setIsCollapsed }: { isCollapsed: boolean,
           </button>
           <div className="h-px bg-slate-800 my-1 mx-2" />
           <button 
-            onClick={() => supabase.auth.signOut()}
+            onClick={async () => {
+              try {
+                localStorage.removeItem('mbf_sandbox_user');
+                if (supabase?.auth) {
+                  await supabase.auth.signOut();
+                }
+              } catch (err) {
+                console.error('Logout error:', err);
+              } finally {
+                window.location.href = window.location.origin;
+              }
+            }}
             className="group relative overflow-hidden flex items-center gap-3 px-3 py-2.5 rounded-lg text-[13px] font-semibold text-slate-200 hover:text-white transition-all duration-300 text-left w-full"
           >
-            <div className="absolute inset-0 bg-rose-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-0" />
+            <div className="absolute inset-0 bg-orange-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-0" />
             <LogOut size={20} className="relative z-10 text-slate-400 group-hover:text-white transition-colors duration-300" />
             <span className="relative z-10 transition-colors duration-300">Keluar</span>
           </button>

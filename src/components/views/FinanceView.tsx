@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SectionContainer } from '../layout/SectionContainer';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 import {
   LineChart,
@@ -496,8 +497,12 @@ export function FinanceView() {
             <TableBody>
               {mitraRecap.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="h-32 text-center">
-                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Tidak ada data untuk periode ini</p>
+                  <TableCell colSpan={5}>
+                    <EmptyState 
+                      icon={Users} 
+                      title="Data Mitra Kosong" 
+                      description="Tidak ada rekapitulasi mitra untuk periode yang dipilih." 
+                    />
                   </TableCell>
                 </TableRow>
               ) : (

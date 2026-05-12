@@ -4,14 +4,15 @@ import {
   Search, 
   Filter, 
   ChevronDown, 
-  History, 
+  NotebookPen, 
   Info,
   ArrowDownLeft,
   ArrowUpRight,
   ShoppingCart,
   MessageSquare,
   DollarSign,
-  Trash2
+  Trash2,
+  History
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,6 +30,7 @@ import {
   PopoverTrigger 
 } from '@/components/ui/popover';
 import { SectionContainer } from '../layout/SectionContainer';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 
 import { useDashboard } from '../../contexts/DashboardContext';
@@ -192,7 +194,7 @@ export function EggWarehouseView() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-200">
-                <History size={20} />
+                <NotebookPen size={20} />
               </div>
               <div>
                 <h3 className="text-base font-black text-slate-900 tracking-tight uppercase tracking-widest">Buku Catatan Telur</h3>
@@ -288,7 +290,13 @@ export function EggWarehouseView() {
                 </TableRow>
             ) : paginatedData.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Tidak ada data transaksi</TableCell>
+                    <TableCell colSpan={6}>
+                      <EmptyState 
+                        icon={History} 
+                        title="Transaksi Kosong" 
+                        description="Tidak ditemukan riwayat transaksi telur untuk kriteria ini." 
+                      />
+                    </TableCell>
                 </TableRow>
             ) : paginatedData.map((row, i) => {
               const jt = row.jenis_transaksi?.toLowerCase() || '';
@@ -298,7 +306,7 @@ export function EggWarehouseView() {
               const isBeli = displayJenis === 'Beli Telur';
 
               return (
-                <TableRow key={i} className="group hover:bg-slate-50 transition-colors border-slate-50">
+                <TableRow key={row.id || i} className="group hover:bg-slate-50 transition-colors border-slate-50">
                   <TableCell className="pl-10 py-5">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{row.id?.slice(0, 8).toUpperCase()}</span>
@@ -356,15 +364,17 @@ export function EggWarehouseView() {
                       >
                         <DollarSign size={16} />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 hover:shadow-sm transition-all"
-                        onClick={() => handleDeleteEggTransaction(row.id)}
-                        title="Hapus Data"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
+                      {userRole !== 'viewer' && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 hover:shadow-sm transition-all"
+                          onClick={() => handleDeleteEggTransaction(row.id)}
+                          title="Hapus Data"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

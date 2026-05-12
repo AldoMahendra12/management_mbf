@@ -6,13 +6,14 @@ import {
   Search, 
   Filter, 
   ChevronDown, 
-  History, 
+  NotebookPen, 
   Info,
   ArrowDownLeft,
   ArrowUpRight,
   MessageSquare,
   DollarSign,
-  Trash2
+  Trash2,
+  History
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
@@ -31,6 +32,7 @@ import {
   PopoverTrigger 
 } from '@/components/ui/popover';
 import { SectionContainer } from '../layout/SectionContainer';
+import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
 
 import { useDashboard } from '../../contexts/DashboardContext';
@@ -243,8 +245,8 @@ export function FeedWarehouseView() {
         <div className="bg-white px-10 py-8 border-b border-slate-100 flex flex-col gap-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-slate-900 flex items-center justify-center text-white shadow-lg shadow-slate-200">
-                <History size={20} />
+              <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+                <NotebookPen size={20} />
               </div>
               <div>
                 <h3 className="text-base font-black text-slate-900 tracking-tight uppercase tracking-widest">Buku Catatan Pakan</h3>
@@ -340,7 +342,13 @@ export function FeedWarehouseView() {
               </TableRow>
             ) : filteredFeeds.length === 0 ? (
                 <TableRow>
-                    <TableCell colSpan={6} className="h-32 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Tidak ada data transaksi</TableCell>
+                    <TableCell colSpan={6}>
+                      <EmptyState 
+                        icon={History} 
+                        title="Catatan Kosong" 
+                        description="Tidak ditemukan riwayat transaksi pakan untuk kriteria ini." 
+                      />
+                    </TableCell>
                 </TableRow>
             ) : paginatedData.map((row, i) => {
               const jt = row.jenis_transaksi?.toLowerCase() || '';
@@ -350,7 +358,7 @@ export function FeedWarehouseView() {
               const isBeli = displayJenis === 'Beli Pakan';
 
               return (
-                <TableRow key={i} className="group hover:bg-slate-50 transition-colors border-slate-50">
+                <TableRow key={row.id || i} className="group hover:bg-slate-50 transition-colors border-slate-50">
                   <TableCell className="pl-10 py-5">
                     <div className="flex flex-col">
                       <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">{row.id?.slice(0, 8).toUpperCase()}</span>
@@ -408,15 +416,17 @@ export function FeedWarehouseView() {
                       >
                         <DollarSign size={16} />
                       </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="h-8 w-8 p-0 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 hover:shadow-sm transition-all"
-                        onClick={() => handleDeleteFeedTransaction(row.id)}
-                        title="Hapus Data"
-                      >
-                        <Trash2 size={16} />
-                      </Button>
+                      {userRole !== 'viewer' && (
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="h-8 w-8 p-0 rounded-lg text-slate-300 hover:text-rose-600 hover:bg-rose-50 hover:shadow-sm transition-all"
+                          onClick={() => handleDeleteFeedTransaction(row.id)}
+                          title="Hapus Data"
+                        >
+                          <Trash2 size={16} />
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

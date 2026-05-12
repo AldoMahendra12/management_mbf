@@ -1,7 +1,3 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
-
 # MBF Management System (PT MBF & CV BEF)
 
 Sistem manajemen operasional dan keuangan terintegrasi yang dirancang khusus untuk pengelolaan peternakan ayam petelur dan distribusi pakan. Aplikasi ini mengonsolidasikan data dari dua entitas (**PT Mitra Barokah Farm** dan **CV Berkah Egg Farm**) ke dalam satu dashboard eksekutif yang interaktif.

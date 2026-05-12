@@ -14,15 +14,13 @@ export default function Login() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) return;
-    
     setLoading(true);
     setError(null);
 
     try {
       const input = username.trim().toLowerCase();
       
-      // Sandbox User Check
+      // Sandbox User Check - Works even without Supabase
       if (input === 'trial_mbf' && password === 'trial123') {
         localStorage.setItem('mbf_sandbox_user', JSON.stringify({
           name: 'User Trial',
@@ -31,6 +29,10 @@ export default function Login() {
         }));
         window.location.reload();
         return;
+      }
+
+      if (!supabase) {
+        throw new Error('Konfigurasi database (Supabase) belum terpasang di environment variables.');
       }
 
       // Handle both username prefix and full email

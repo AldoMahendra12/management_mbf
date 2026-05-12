@@ -1,132 +1,147 @@
 import React from 'react';
-import { Plus, ArrowUpRight } from 'lucide-react';
+import { Plus, TrendingUp, History, UserMinus, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { SectionContainer } from '../layout/SectionContainer';
-import { cn } from '@/lib/utils';
-
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDashboard } from '../../contexts/DashboardContext';
 
-const POPULATION_EVENTS = [
-  { id: 1, date: '20 Apr 2026', type: 'Afkir', amount: 12, kandang: 'Kandang B2', note: 'Indikasi penyakit pernafasan (Kematian)', color: 'bg-red-500' },
-  { id: 2, date: '15 Apr 2026', type: 'Afkir', amount: 45, kandang: 'Kandang A1', note: 'Produksi menurun signifikan (Afkir)', color: 'bg-red-500' },
-  { id: 3, date: '12 Apr 2026', type: 'Ayam Masuk', amount: 2500, kandang: 'Kandang D1', note: 'Batch baru dari supplier', color: 'bg-blue-500' },
-  { id: 4, date: '1 Apr 2026', type: 'Afkir', amount: 80, kandang: 'Kandang A2', note: 'Batch akhir masa produksi', color: 'bg-red-500' },
-  { id: 5, date: '22 Mar 2026', type: 'Afkir', amount: 8, kandang: 'Kandang B1', note: 'Heat stress (Kematian)', color: 'bg-red-500' },
-];
-
 export function PopulationView() {
-  const { userRole, setIsPopulationModalOpen } = useDashboard();
+  const { 
+    userRole, 
+    setIsAfkirModalOpen, 
+    afkirTransactions, 
+    formatMoney 
+  } = useDashboard();
+
+  const totalEkor = afkirTransactions.reduce((acc, curr) => acc + (curr.qty_ekor || 0), 0);
+  const totalRevenue = afkirTransactions.reduce((acc, curr) => acc + (curr.total_harga || 0), 0);
+
   return (
     <SectionContainer className="space-y-6">
       <div className="flex items-center justify-between bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Populasi</h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Pantau data populasi ayam, mortalitas, dan mutasi kandang</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Manajemen Afkir Ayam</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest gap-2 flex items-center">
+            <TrendingUp size={12} className="text-orange-500" />
+            Pantau data penjualan ayam afkir dan kontribusinya ke keuangan
+          </p>
         </div>
         <Button 
           disabled={userRole === 'viewer'}
-          className="bg-orange-600 hover:bg-orange-700 text-white h-11 px-6 gap-2 shadow-lg shadow-orange-500/20 font-black text-xs uppercase tracking-widest rounded-lg" 
-          onClick={() => setIsPopulationModalOpen(true)}
+          className="bg-orange-600 hover:bg-orange-700 text-white h-11 px-6 gap-2 shadow-lg shadow-orange-500/20 font-black text-xs uppercase tracking-widest rounded-lg transition-all active:scale-95" 
+          onClick={() => setIsAfkirModalOpen(true)}
         >
           <Plus size={18} />
-          Catat Kejadian
+          Catat Penjualan Afkir
         </Button>
       </div>
 
-      {/* Population Summary (3 large cards) */}
-      <div className="grid grid-cols-3 gap-6">
-        {[
-          { label: 'Total Populasi Aktif', val: '28.450 ekor', sub: 'Per hari ini, semua kandang' },
-          { label: 'Kandang Baterai (Bertelur)', val: '26.200 ekor', sub: 'Siap bertelur aktif' },
-          { label: 'Kandang Grower', val: '2.250 ekor', sub: 'Dalam masa pembesaran' },
-        ].map((card, i) => (
-          <div key={i} className="bg-white border border-slate-100 p-6 rounded-lg shadow-sm flex flex-col justify-between h-[160px]">
-             <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">{card.label}</p>
-             <div>
-               <h3 className="text-3xl font-black text-slate-900 tracking-tighter">{card.val}</h3>
-               <p className="text-[10px] font-bold text-slate-400 mt-2 opacity-70 tracking-tight">{card.sub}</p>
-             </div>
-          </div>
-        ))}
-      </div>
-
-       <div className="p-6 bg-slate-900 rounded-xl border border-slate-800 shadow-2xl relative overflow-hidden">
-          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-             <div>
-               <h4 className="text-xs font-black text-orange-500 uppercase tracking-[0.3em] mb-2">Manajemen Terpusat</h4>
-               <h3 className="text-2xl font-black text-white tracking-tight">Total Populasi Kandang MBF</h3>
-               <p className="text-[10px] font-bold text-slate-400 mt-2 max-w-md leading-relaxed uppercase tracking-widest">Seluruh ayam dikelola secara kolektif oleh PT. MBF. Tidak ada pembagian data per owner individu dalam sistem.</p>
-             </div>
-            <div className="flex gap-4">
-              <div className="px-6 py-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
-                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Kapasitas</p>
-                 <p className="text-xl font-black text-white tracking-tighter">35.000 Ekor</p>
-              </div>
-              <div className="px-6 py-4 bg-white/5 backdrop-blur-sm rounded-lg border border-white/10">
-                 <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest mb-1">utilitas Kandang</p>
-                 <p className="text-xl font-black text-orange-500 tracking-tighter">81.3%</p>
-              </div>
+      {/* Afkir Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Total Ayam Afkir */}
+        <div className="bg-white border border-orange-100 rounded-xl p-6 shadow-sm relative overflow-hidden group hover:shadow-md hover:border-orange-300 transition-all">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-50/80 to-transparent pointer-events-none group-hover:from-orange-50 transition-colors" />
+          <div className="relative z-10 flex items-start justify-between mb-4">
+            <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <UserMinus size={18} className="text-orange-600" />
             </div>
-         </div>
+            <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-2 py-1 rounded-full border border-orange-100">
+              Populasi
+            </span>
+          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 group-hover:text-orange-600 transition-colors">Total Ayam Afkir</p>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{totalEkor.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black uppercase ml-1 tracking-widest">Ekor</span></h3>
+            <p className="text-[9px] font-bold text-slate-400 mt-1.5 opacity-70">Akumulasi seluruh penjualan afkir</p>
+          </div>
+        </div>
+
+        {/* Total Hasil Penjualan */}
+        <div className="bg-white border border-emerald-100 rounded-xl p-6 shadow-sm relative overflow-hidden group hover:shadow-md hover:border-emerald-300 transition-all">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/80 to-transparent pointer-events-none group-hover:from-emerald-50 transition-colors" />
+          <div className="relative z-10 flex items-start justify-between mb-4">
+            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+              <TrendingUp size={18} className="text-emerald-600" />
+            </div>
+            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-1 rounded-full border border-emerald-100">
+              Pendapatan
+            </span>
+          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 group-hover:text-emerald-600 transition-colors">Total Hasil Penjualan</p>
+            <h3 className="text-2xl font-black text-slate-900 tracking-tighter">{formatMoney(totalRevenue)}</h3>
+            <p className="text-[9px] font-bold text-slate-400 mt-1.5 opacity-70 italic uppercase tracking-widest">Otomatis masuk ke arus kas keuangan</p>
+          </div>
+        </div>
       </div>
 
-      {/* Full Width Layout */}
-      <div className="pb-6">
-        {/* Left Column: Timeline (now full width) */}
-        <Card className="border-slate-200/60 shadow-sm overflow-hidden flex flex-col">
-          <CardHeader className="bg-slate-50/50 border-b border-slate-100 px-6 py-5">
-            <CardTitle className="text-base font-black text-slate-800 uppercase tracking-tight">Riwayat Kejadian</CardTitle>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 opacity-70 italic">Dicatat hanya saat terjadi. Tidak ada kewajiban input harian.</p>
-            
-            <div className="flex items-center mt-6">
-               <div className="flex bg-white p-1 rounded-lg border border-slate-200 shadow-inner">
-                  {['Semua', 'Ayam Masuk', 'Afkir'].map((t) => (
-                    <button key={t} className={cn("px-4 py-1.5 text-[9px] font-black uppercase tracking-widest transition-all rounded-md", t === 'Semua' ? "bg-slate-900 text-white shadow-sm" : "text-slate-400 hover:text-slate-600")}>
-                      {t}
-                    </button>
-                  ))}
-               </div>
+      {/* Main Content Area */}
+      <div className="grid grid-cols-1 gap-6">
+        <Card className="border-slate-200/60 shadow-sm overflow-hidden">
+          <CardHeader className="bg-slate-50/50 border-b border-slate-100 px-6 py-5 flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                <History size={18} className="text-slate-400" />
+                Riwayat Penjualan Afkir
+              </CardTitle>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1 opacity-70 italic">Semua hasil penjualan otomatis tercatat dalam arus kas keuangan</p>
+            </div>
+            <div className="flex items-center gap-2">
+               <Badge variant="outline" className="text-[10px] font-black border-slate-200 text-slate-400">
+                  {afkirTransactions.length} TRANSAKSI
+               </Badge>
             </div>
           </CardHeader>
-          <CardContent className="p-8">
-             <div className="relative space-y-8">
-                {/* Timeline backbone */}
-                <div className="absolute left-[3px] top-2 bottom-0 w-0.5 bg-slate-100" />
-
-                {POPULATION_EVENTS.map((event) => (
-                  <div key={event.id} className="relative pl-8 flex flex-col gap-2 group">
-                     <div className={cn("absolute left-0 top-1.5 w-2 h-2 rounded-full border-2 border-white ring-2 ring-slate-50", event.color)} />
-                     
-                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{event.date}</span>
-                           <Badge className={cn(
-                              "text-[8px] font-black uppercase px-2 py-0.5 rounded-lg border-none shadow-none",
-                              event.type === 'Kematian' ? "bg-red-50 text-red-600" : "bg-amber-50 text-amber-600"
-                           )}>
-                              {event.type}
-                           </Badge>
-                           <span className="text-xs font-black text-slate-900">{event.amount} ekor</span>
-                        </div>
-                     </div>
-
-                     <div className="flex flex-col gap-1">
-                        <p className="text-xs font-black text-slate-800 tracking-tight">{event.kandang}</p>
-                        <p className="text-xs font-medium text-slate-400 italic">"{event.note}"</p>
-                     </div>
-                  </div>
-                ))}
-             </div>
-             
-             <Button variant="link" className="p-0 h-auto text-[10px] font-black text-orange-600 uppercase tracking-widest hover:no-underline mt-10 group">
-                Lihat semua riwayat <ArrowUpRight size={14} className="ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-             </Button>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b-2 border-slate-100 hover:bg-transparent">
+                  <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 pl-6">Tanggal</TableHead>
+                  <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400">Mitra/Pembeli</TableHead>
+                  <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 text-center">Jumlah (Qty)</TableHead>
+                  <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 text-right">Harga Satuan</TableHead>
+                  <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 text-right pr-6">Total Hasil</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {afkirTransactions.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="h-32 text-center text-slate-400 italic text-xs">
+                      Belum ada data penjualan ayam afkir yang dicatat.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  afkirTransactions.map((t, i) => (
+                    <TableRow key={t.id || i} className="border-b border-slate-50 hover:bg-slate-50/50 transition-colors">
+                      <TableCell className="py-4 pl-6 text-[11px] font-bold text-slate-400">
+                        {new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' })}
+                      </TableCell>
+                      <TableCell className="py-4 text-[12px] font-black uppercase text-slate-900 tracking-tight">
+                        {t.mitra_name || 'Umum'}
+                      </TableCell>
+                      <TableCell className="py-4 text-center text-[12px] font-black text-slate-600">
+                        {t.qty_ekor} <span className="text-[10px] text-slate-400 font-bold ml-0.5">EKOR</span>
+                      </TableCell>
+                      <TableCell className="py-4 text-right text-[11px] font-bold text-slate-400 tabular-nums">
+                        {formatMoney(t.harga_per_satuan)}
+                      </TableCell>
+                      <TableCell className="py-4 text-right pr-6 text-[12px] font-black text-emerald-600 tabular-nums">
+                        {formatMoney(t.total_harga)}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
-
       </div>
     </SectionContainer>
   );
+}
+
+function cn(...inputs: any[]) {
+  return inputs.filter(Boolean).join(' ');
 }

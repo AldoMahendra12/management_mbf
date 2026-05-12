@@ -111,7 +111,8 @@ export const EggDetailModal: React.FC = () => {
               <div className="absolute top-0 right-0 w-32 h-32 bg-orange-500/5 rounded-full blur-3xl pointer-events-none" />
               
               {(() => {
-                const totalPaid = paymentHistory.reduce((sum, p) => sum + (p.nominal || 0), 0);
+                const safeHistory = paymentHistory || [];
+                const totalPaid = safeHistory.reduce((sum, p) => sum + (p.nominal || 0), 0);
                 const sisa = Math.max(0, (selectedEggDetail.total_harga || 0) - totalPaid);
                 const progress = Math.round((totalPaid / (selectedEggDetail.total_harga || 1)) * 100);
 
@@ -163,12 +164,12 @@ export const EggDetailModal: React.FC = () => {
                 Riwayat Pembayaran
               </span>
               <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[8px] font-black text-slate-500 uppercase">
-                {paymentHistory.length} Kali
+                {(paymentHistory || []).length} Kali
               </span>
             </div>
 
             <div className="relative pl-10 space-y-8 before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-[2px] before:bg-slate-100">
-              {paymentHistory.length === 0 ? (
+              {(!paymentHistory || paymentHistory.length === 0) ? (
                 <div className="py-10 flex flex-col items-center justify-center bg-white rounded-2xl border border-dashed border-slate-200 -ml-10 shadow-sm">
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic">Belum ada riwayat</p>
                 </div>

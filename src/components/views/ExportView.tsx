@@ -15,11 +15,13 @@ import { Badge } from '@/components/ui/badge';
 import { SectionContainer } from '../layout/SectionContainer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
+import logoMBF from '../../assets/logo_MBF.png';
+import logoBEF from '../../assets/logo_BEF.png';
 
 import { useDashboard } from '../../contexts/DashboardContext';
 
 export function ExportView() {
-  const { eggTransactions, feedTransactions, formatMoney, showToast } = useDashboard();
+  const { eggTransactions, feedTransactions, afkirTransactions, formatMoney, showToast } = useDashboard();
   
   const RECENT_EXPORTS = [
     { name: 'Laporan Penjualan April 2026', period: 'Apr 2026', user: 'Bu Latifun', date: '28 Apr 2026', format: 'PDF' },
@@ -30,6 +32,7 @@ export function ExportView() {
     { name: 'Laporan Stok Pakan Feb 2026', period: 'Feb 2026', user: 'Bu Latifun', date: '3 Mar 2026', format: 'Excel' },
   ];
   const [reportType, setReportType] = useState('Laporan Penjualan Telur');
+  const [selectedEntity, setSelectedEntity] = useState<'MBF' | 'BEF'>('MBF');
   const printRefLaporan = useRef<HTMLDivElement>(null);
   const handlePrintLaporan = useReactToPrint({ contentRef: printRefLaporan });
 
@@ -86,86 +89,104 @@ export function ExportView() {
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Ekspor Data</h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unduh laporan operasional dan finansial untuk arsip</p>
         </div>
+        
+        <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 shadow-inner">
+          <button
+            onClick={() => setSelectedEntity('MBF')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+              selectedEntity === 'MBF' ? "bg-white text-slate-900 shadow-md" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            PT MBF
+          </button>
+          <button
+            onClick={() => setSelectedEntity('BEF')}
+            className={cn(
+              "px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+              selectedEntity === 'BEF' ? "bg-white text-slate-900 shadow-md" : "text-slate-400 hover:text-slate-600"
+            )}
+          >
+            CV BEF
+          </button>
+        </div>
+
         <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Terakhir diekspor: 28 Apr 2026</p>
       </div>
 
-      {/* Quick Export Strip */}
-      <div className="grid grid-cols-3 gap-6">
+      {/* Financial Report Entity Selection */}
+      <div className="grid grid-cols-2 gap-6">
         {[
           { 
-            title: 'Laporan Penjualan', 
+            title: 'Laporan Keuangan PT MBF', 
+            entity: 'MBF' as const,
             icon: TrendingUp, 
-            desc: 'Rekap semua transaksi penjualan telur beserta status pembayaran per periode',
-            hasFilter: false
+            desc: 'Rekapitulasi finansial lengkap untuk PT Mitra Barokah Farm mencakup arus kas, margin, dan laba rugi.',
           },
           { 
-            title: 'Laporan Stok Pakan', 
-            icon: Package, 
-            desc: 'Riwayat masuk keluar pakan, saldo terkini, dan total biaya per bahan',
-            hasFilter: true,
-            filterType: 'Bahan Pakan'
-          },
-          { 
-            title: 'Laporan Piutang', 
+            title: 'Laporan Keuangan CV BEF', 
+            entity: 'BEF' as const,
             icon: FileText, 
-            desc: 'Semua invoice, status pembayaran, dan riwayat cicilan per customer',
-            hasFilter: true,
-            filterType: 'Status'
+            desc: 'Rekapitulasi finansial lengkap untuk CV Barokah Eka Farm mencakup arus kas, margin, dan laba rugi.',
           },
         ].map((card, i) => (
-          <Card key={i} className="border-slate-200/60 shadow-sm group hover:border-orange-200/50 transition-all flex flex-col">
-              <CardHeader className="p-6 pb-2">
-                    <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-orange-50 group-hover:text-orange-500 transition-all mb-4">
-                    <card.icon size={20} />
+          <Card key={i} className="border-slate-200/60 shadow-sm group hover:border-orange-200/50 transition-all flex flex-col relative overflow-hidden">
+              <div className={cn(
+                "absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-[0.03] transition-transform group-hover:scale-150",
+                card.entity === 'MBF' ? "bg-slate-900" : "bg-orange-600"
+              )} />
+              
+              <CardHeader className="p-8 pb-4">
+                <div className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center transition-all mb-6 shadow-sm",
+                  card.entity === 'MBF' ? "bg-slate-900 text-white" : "bg-orange-500 text-white"
+                )}>
+                    <card.icon size={24} />
                 </div>
-                <CardTitle className="text-sm font-black text-slate-900 uppercase tracking-tight">{card.title}</CardTitle>
-                <p className="text-[11px] font-medium text-slate-400 mt-2 leading-relaxed">{card.desc}</p>
+                <CardTitle className="text-lg font-black text-slate-900 uppercase tracking-tight">{card.title}</CardTitle>
+                <p className="text-xs font-medium text-slate-400 mt-2 leading-relaxed">{card.desc}</p>
               </CardHeader>
-              <CardContent className="p-6 pt-4 space-y-4 mt-auto">
-                <div className="space-y-3">
-                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded-lg border border-slate-100">
+              
+              <CardContent className="p-8 pt-4 space-y-6 mt-auto">
+                <div className="flex items-center gap-4">
+                    <div className="flex-1 flex items-center gap-2 p-2.5 bg-slate-50 rounded-xl border border-slate-100">
                       <Calendar size={14} className="text-slate-400" />
-                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tight">1 Apr - 29 Apr</span>
+                      <span className="text-[10px] font-black text-slate-600 uppercase tracking-tight">
+                        {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                      </span>
                     </div>
-                    {card.hasFilter && (
-                      <div className="relative">
-                        <select className="w-full bg-slate-50 border border-slate-100 rounded-lg py-2 pl-3 pr-8 text-[10px] font-black uppercase tracking-widest outline-none appearance-none focus:bg-white focus:border-orange-200 transition-all cursor-pointer text-slate-500">
-                          <option>Semua {card.filterType}</option>
-                          {card.filterType === 'Bahan Pakan' ? (
-                            <>
-                              <option>Katul</option>
-                              <option>Jagung</option>
-                            </>
-                          ) : (
-                            <>
-                              <option>Belum Lunas</option>
-                              <option>Jatuh Tempo</option>
-                            </>
-                          )}
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={12} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
+                    <Badge className={cn(
+                      "text-[9px] font-black uppercase px-2 py-1 rounded-lg border-none shadow-none",
+                      card.entity === 'MBF' ? "bg-slate-100 text-slate-900" : "bg-orange-50 text-orange-600"
+                    )}>
+                      FULL REKAP
+                    </Badge>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-3">
                     <Button 
                       onClick={() => {
-                        setReportType(card.title === 'Laporan Penjualan' ? 'Laporan Penjualan Telur' : 
-                                      card.title === 'Laporan Stok Pakan' ? 'Laporan Stok Pakan' : 'Laporan Piutang');
+                        setSelectedEntity(card.entity);
+                        setReportType(card.title);
                         setTimeout(() => handlePrintLaporan(), 100);
                       }}
-                      className="h-9 text-[9px] font-black uppercase tracking-widest rounded-lg bg-orange-600 text-white shadow-lg shadow-orange-500/10"
+                      className={cn(
+                        "h-11 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95",
+                        card.entity === 'MBF' ? "bg-slate-900 text-white shadow-slate-900/10" : "bg-orange-600 text-white shadow-orange-600/10"
+                      )}
                     >
-                      PDF
+                      <Printer size={14} className="mr-2" />
+                      PDF REPORT
                     </Button>
                     <Button 
-                      onClick={() => handleExportCSV(card.title === 'Laporan Penjualan' ? 'telur' : 'pakan')}
+                      onClick={() => handleExportCSV('telur')}
                       variant="outline"
-                      className="h-9 text-[9px] font-black uppercase tracking-widest rounded-lg border-slate-200 text-slate-600"
+                      className="h-11 text-[10px] font-black uppercase tracking-widest rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50"
                     >
-                      CSV
+                      <Download size={14} className="mr-2" />
+                      CSV DATA
                     </Button>
-                  </div>
+                </div>
               </CardContent>
           </Card>
         ))}
@@ -175,122 +196,140 @@ export function ExportView() {
       <Card className="border-slate-200/60 shadow-sm">
         <CardHeader className="bg-slate-50/50 border-b border-slate-100 px-8 py-5 flex flex-row items-center justify-between">
           <CardTitle className="text-base font-black text-slate-800 uppercase tracking-tight">Preview Laporan</CardTitle>
-          <div className="relative w-64">
-              <select 
-                value={reportType}
-                onChange={(e) => setReportType(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-lg py-1.5 pl-3 pr-8 text-[10px] font-black uppercase tracking-widest outline-none appearance-none focus:border-orange-200 transition-all cursor-pointer"
-              >
-                  <option>Laporan Penjualan Telur</option>
-                  <option>Laporan Stok Pakan</option>
-                  <option>Laporan Piutang</option>
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-[10px] font-black border-slate-200 text-slate-400 px-3 py-1">
+              {selectedEntity === 'MBF' ? 'ENTITY: PT MBF' : 'ENTITY: CV BEF'}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="p-12 bg-slate-100/50 flex flex-col items-center">
             {/* A4 Paper Preview */}
             <div ref={printRefLaporan} className="bg-white w-full max-w-[800px] min-h-[1100px] shadow-2xl shadow-slate-200 p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200">
-              <div className="flex justify-between items-start border-b-2 border-slate-900 pb-8">
-                  <div>
-                    <h1 className="text-2xl font-black tracking-tighter">MITRA BAROKAH FARM</h1>
-                    <p className="text-sm font-bold text-slate-400 mt-1 uppercase tracking-widest">{reportType}</p>
+              {/* Official Letterhead */}
+              <div className="flex items-center justify-between border-b-[3px] border-slate-900 pb-8">
+                  <div className="flex items-center gap-6">
+                    <img 
+                      src={selectedEntity === 'MBF' ? logoMBF : logoBEF} 
+                      alt="Logo" 
+                      className="h-20 w-auto object-contain" 
+                    />
+                    <div className="h-16 w-[2px] bg-slate-200" />
+                    <div className="flex flex-col">
+                      <h1 className="text-3xl font-black tracking-tighter text-slate-900">
+                        {selectedEntity === 'MBF' ? 'PT MITRA BAROKAH FARM' : 'CV BAROKAH EKA FARM'}
+                      </h1>
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.3em] mt-1">Livestock & Feed Management System</p>
+                      <div className="mt-2 space-y-0.5">
+                        <p className="text-[9px] font-bold text-slate-500 uppercase">
+                          {selectedEntity === 'MBF' 
+                            ? 'Jl. Raya Tulungagung - Trenggalek No. 45' 
+                            : 'Dusun Krajan, Desa Bendorejo, Pogalan'}
+                        </p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase">
+                          Email: admin@{selectedEntity === 'MBF' ? 'barokahfarm.id' : 'ekafarm.id'} | Telp: (0355) 321xxx
+                        </p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-[11px] font-black uppercase tracking-widest">Periode: <span className="text-slate-900">{new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}</span></p>
-                    <p className="text-[11px] font-bold text-slate-400 mt-1 uppercase tracking-widest">Dicetak: {new Date().toLocaleDateString('id-ID')}</p>
+                  <div className="flex flex-col items-end gap-1.5">
+                    <div className="bg-slate-900 text-white px-4 py-2 rounded-lg mb-2 shadow-sm">
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">{reportType}</p>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Periode Laporan</p>
+                      <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight mt-0.5">
+                        {new Date().toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end mt-1">
+                      <p className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.2em]">Dicetak Pada</p>
+                      <p className="text-[10px] font-bold text-slate-400 tabular-nums">
+                        {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                      </p>
+                    </div>
                   </div>
               </div>
 
-              {reportType === 'Laporan Penjualan Telur' ? (
-                <>
-                  <div className="grid grid-cols-4 gap-6">
-                    {[
-                        { label: 'Total Penjualan', val: formatMoney(eggTransactions.reduce((s, t) => s + (t.total_harga || 0), 0), false) },
-                        { label: 'Total Terbayar', val: formatMoney(eggTransactions.reduce((s, t) => s + (t.jumlah_dibayar || 0), 0), false) },
-                        { label: 'Total Piutang', val: formatMoney(eggTransactions.reduce((s, t) => s + ((t.total_harga || 0) - (t.jumlah_dibayar || 0)), 0), false) },
-                        { label: 'Total Transaksi', val: eggTransactions.length },
-                    ].map((s, i) => (
-                        <div key={i} className="bg-slate-50 p-4 rounded-lg flex flex-col gap-1 border border-slate-100">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
-                          <p className="text-xs font-black text-slate-900">{s.val}</p>
-                        </div>
-                    ))}
-                  </div>
+              {/* Report Summary */}
+              <div className="grid grid-cols-3 gap-6">
+                {[
+                    { label: 'Total Pemasukan', val: formatMoney(
+                      eggTransactions.reduce((s, t) => s + (t.total_harga || 0), 0) + 
+                      feedTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) +
+                      afkirTransactions.reduce((s, t) => s + (t.total_harga || 0), 0)
+                      , false) 
+                    },
+                    { label: 'Total Pengeluaran', val: formatMoney(
+                      feedTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + 
+                      eggTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0)
+                      , false) 
+                    },
+                    { label: 'Selisih Bersih', val: formatMoney(
+                      (eggTransactions.reduce((s, t) => s + (t.total_harga || 0), 0) + feedTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + afkirTransactions.reduce((s, t) => s + (t.total_harga || 0), 0)) - 
+                      (feedTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + eggTransactions.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0))
+                      , false) 
+                    },
+                ].map((s, i) => (
+                    <div key={i} className="bg-slate-50 p-6 rounded-xl flex flex-col gap-1.5 border border-slate-100">
+                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
+                      <p className="text-sm font-black text-slate-900 tabular-nums">{s.val}</p>
+                    </div>
+                ))}
+              </div>
 
-                  <div className="flex-1">
-                      <Table className="border-t border-slate-100">
-                        <TableHeader>
-                            <TableRow className="border-b-2 border-slate-100 hover:bg-transparent">
-                              <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Invoice</TableHead>
-                              <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Customer</TableHead>
-                              <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Total</TableHead>
-                              <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0 pr-4">Status</TableHead>
+              <div className="flex-1">
+                  <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] mb-4 border-b pb-2">Rincian Transaksi Konsolidasi</h3>
+                  <Table>
+                    <TableHeader>
+                        <TableRow className="border-b-2 border-slate-100 hover:bg-transparent">
+                          <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Tanggal</TableHead>
+                          <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Keterangan</TableHead>
+                          <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0 text-right">Debit</TableHead>
+                          <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0 text-right pr-4">Kredit</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {[...eggTransactions, ...feedTransactions, ...afkirTransactions].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).slice(0, 30).map((t, i) => {
+                          const isAfkir = !t.jenis_transaksi && t.mitra_name; // Simple check for afkir object structure
+                          const isIncome = isAfkir || t.jenis_transaksi?.toLowerCase().includes('jual') || t.jenis_transaksi?.toLowerCase().includes('keluar') || (t.total_harga && !t.jenis_transaksi?.toLowerCase().includes('beli'));
+                          const amount = t.total_harga || t.total_tagihan || 0;
+                          const customer = (t.mitra_name || t.nama_mitra || t.keterangan?.replace('Mitra: ', '') || 'Umum').split('|')[0].trim();
+                          const description = isAfkir ? 'Penjualan Ayam Afkir' : (t.jenis_transaksi || 'Penjualan Telur');
+                          
+                          return (
+                            <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
+                                <TableCell className="py-3 text-[10px] font-bold text-slate-400">{new Date(t.tanggal).toLocaleDateString('id-ID', {day: '2-digit', month: '2-digit'})}</TableCell>
+                                <TableCell className="py-3 text-left text-[11px] font-black uppercase text-slate-900">
+                                  {description} - {customer}
+                                </TableCell>
+                                <TableCell className="py-3 text-right text-[11px] font-black text-blue-600 tabular-nums">{!isIncome ? formatMoney(amount, false) : '-'}</TableCell>
+                                <TableCell className="py-3 text-right pr-4 text-[11px] font-black text-emerald-600 tabular-nums">{isIncome ? formatMoney(amount, false) : '-'}</TableCell>
                             </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {eggTransactions.slice(0, 15).map((t, i) => {
-                              const sisa = (t.total_harga || 0) - (t.jumlah_dibayar || 0);
-                              return (
-                                <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
-                                    <TableCell className="py-4 text-[11px] font-bold text-slate-600">{t.id.slice(0, 8).toUpperCase()}</TableCell>
-                                    <TableCell className="py-4 text-left text-[11px] font-black uppercase">{t.keterangan?.replace('Mitra: ', '')}</TableCell>
-                                    <TableCell className="py-4 text-left text-[11px] font-black text-slate-900">{formatMoney(t.total_harga, true)}</TableCell>
-                                    <TableCell className="py-4 text-left pr-4 text-[10px] font-black text-slate-400">
-                                      {sisa <= 0 ? 'LUNAS' : sisa === t.total_harga ? 'BELUM LUNAS' : 'SEBAGIAN'}
-                                    </TableCell>
-                                </TableRow>
-                              );
-                            })}
-                        </TableBody>
-                      </Table>
-                  </div>
-                </>
-              ) : reportType === 'Laporan Stok Pakan' ? (
-                <>
-                    <div className="grid grid-cols-3 gap-6">
-                    {[
-                        { label: 'Total Pembelian', val: formatMoney(feedTransactions.reduce((s, t) => s + (t.total_tagihan || 0), 0), false) },
-                        { label: 'Sisa Utang', val: formatMoney(feedTransactions.reduce((s, t) => s + ((t.total_tagihan || 0) - (t.dibayar_hari_ini || 0)), 0), false) },
-                        { label: 'Total Transaksi', val: feedTransactions.length },
-                    ].map((s, i) => (
-                        <div key={i} className="bg-slate-50 p-4 rounded-lg flex flex-col gap-1 border border-slate-100">
-                          <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
-                          <p className="text-xs font-black text-slate-900">{s.val}</p>
-                        </div>
-                    ))}
-                  </div>
+                          );
+                        })}
+                    </TableBody>
+                  </Table>
+              </div>
 
-                  <div className="flex-1">
-                      <Table className="border-t border-slate-100">
-                        <TableHeader>
-                            <TableRow className="border-b-2 border-slate-100 hover:bg-transparent">
-                              <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Invoice</TableHead>
-                              <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Supplier</TableHead>
-                              <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Total Tagihan</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {feedTransactions.slice(0, 15).map((t, i) => (
-                                <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
-                                    <TableCell className="py-4 text-[11px] font-bold text-slate-600">{t.id.slice(0, 8).toUpperCase()}</TableCell>
-                                    <TableCell className="py-4 text-left text-[11px] font-black uppercase">{t.keterangan?.replace('Mitra: ', '')}</TableCell>
-                                    <TableCell className="py-4 text-left text-[11px] font-black text-slate-900">{formatMoney(t.total_tagihan, true)}</TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                      </Table>
-                  </div>
-                </>
-              ) : (
-                <div className="flex-1 flex items-center justify-center text-slate-400 italic">
-                    Detail Laporan Piutang akan digenerate otomatis berdasarkan ledger...
+              {/* Signature Section */}
+              <div className="grid grid-cols-2 gap-20 mt-10">
+                <div className="flex flex-col items-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-16">Dibuat Oleh,</p>
+                  <div className="w-40 h-[1px] bg-slate-900 mb-1" />
+                  <p className="text-[10px] font-black uppercase tracking-tighter text-slate-900">Admin Keuangan</p>
                 </div>
-              )}
+                <div className="flex flex-col items-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-16">Mengetahui,</p>
+                  <div className="w-40 h-[1px] bg-slate-900 mb-1" />
+                  <p className="text-[10px] font-black uppercase tracking-tighter text-slate-900">
+                    {selectedEntity === 'MBF' ? 'Pimpinan PT MBF' : 'Pimpinan CV BEF'}
+                  </p>
+                </div>
+              </div>
 
-              <div className="border-t border-slate-100 pt-8 flex justify-between items-center opacity-50">
-                  <p className="text-[10px] font-medium italic">Dokumen ini digenerate otomatis oleh Sistem Admin — Konfidensial</p>
-                  <p className="text-[10px] font-black uppercase tracking-widest">Halaman 1 / 1</p>
+              <div className="border-t-2 border-slate-100 pt-8 flex justify-between items-center opacity-50">
+                  <p className="text-[9px] font-bold italic text-slate-400">Dokumen ini merupakan laporan resmi yang dihasilkan secara otomatis oleh Sistem Admin MBF.</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Halaman 1 / 1</p>
               </div>
             </div>
 

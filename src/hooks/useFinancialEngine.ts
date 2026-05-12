@@ -3,6 +3,7 @@ import { useMemo } from 'react';
 export const useFinancialEngine = (
   eggTransactions: any[],
   feedTransactions: any[],
+  afkirTransactions: any[],
   eggStock: number,
   feedItems: any[]
 ) => {
@@ -73,10 +74,11 @@ export const useFinancialEngine = (
   }), [sisaTelur, sisaPakan, eggTransactions, feedTransactions, eggStock, feedItems]);
 
   const recentCombinedActivities = useMemo(() => [
-    ...eggTransactions.slice(0, 20).map(t => ({ ...t, source: 'Telur' })),
-    ...feedTransactions.slice(0, 20).map(t => ({ ...t, source: 'Pakan' }))
+    ...eggTransactions.slice(0, 15).map(t => ({ ...t, source: 'Telur' })),
+    ...feedTransactions.slice(0, 15).map(t => ({ ...t, source: 'Pakan' })),
+    ...afkirTransactions.slice(0, 15).map(t => ({ ...t, source: 'Afkir' }))
   ].sort((a, b) => new Date(b.tanggal || b.created_at).getTime() - new Date(a.tanggal || a.created_at).getTime())
-   .slice(0, 15), [eggTransactions, feedTransactions]);
+   .slice(0, 15), [eggTransactions, feedTransactions, afkirTransactions]);
 
   // --- FINANCIAL ENGINE ---
   const financialData = useMemo(() => {
@@ -108,12 +110,18 @@ export const useFinancialEngine = (
 
     eggTransactions.forEach(t => processTrx(t, true));
     feedTransactions.forEach(t => processTrx(t, false));
+    afkirTransactions.forEach(t => {
+      const tagihan = t.total_harga || 0;
+      const dibayar = t.jumlah_dibayar || 0;
+      totalKas += dibayar;
+      totalPiutang += (tagihan - dibayar);
+    });
 
     return { 
       totalKas, totalPiutang, totalUtang, 
       ledgerArray: Object.values(ledgerMap).filter(l => l.balance !== 0) 
     };
-  }, [eggTransactions, feedTransactions]);
+  }, [eggTransactions, feedTransactions, afkirTransactions]);
 
   return {
     eggReceivables, sisaTelur, summaryTelur,

@@ -99,12 +99,8 @@ interface DashboardContextType {
   setSelectedFeedDetail: (d: any) => void;
   isFeedDetailOpen: boolean;
   setIsFeedDetailOpen: (o: boolean) => void;
-  isPopulationModalOpen: boolean;
-  setIsPopulationModalOpen: (o: boolean) => void;
-  eventEntryType: 'Ayam Masuk' | 'Afkir';
-  setEventEntryType: (type: 'Ayam Masuk' | 'Afkir') => void;
-  isSubmittingPopulation: boolean;
-  handleSubmitPopulation: () => void;
+  isAfkirModalOpen: boolean;
+  setIsAfkirModalOpen: (o: boolean) => void;
   
   // Payment Modal
   invoiceModalMode: 'bayar' | 'detail' | null;
@@ -138,6 +134,24 @@ interface DashboardContextType {
   isSubmittingPayment: boolean;
   setIsSubmittingPayment: (val: boolean) => void;
   handleSubmitPayment: () => Promise<void>;
+  
+  // Afkir State
+  afkirTransactions: any[];
+  afkirDate: string;
+  setAfkirDate: (d: string) => void;
+  afkirQty: number;
+  setAfkirQty: (q: number) => void;
+  afkirWeight: number;
+  setAfkirWeight: (w: number) => void;
+  afkirPrice: number;
+  setAfkirPrice: (p: number) => void;
+  afkirNotes: string;
+  setAfkirNotes: (n: string) => void;
+  afkirMitra: string;
+  setAfkirMitra: (m: string) => void;
+  isSubmittingAfkir: boolean;
+  handleSubmitAfkir: () => Promise<void>;
+  fetchAfkirTransactions: () => void;
   
   setNotification: (n: { show: boolean, message: string, type: 'success' | 'error' }) => void;
 
@@ -233,9 +247,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [isEggDetailOpen, setIsEggDetailOpen] = useState(false);
   const [selectedFeedDetail, setSelectedFeedDetail] = useState<any>(null);
   const [isFeedDetailOpen, setIsFeedDetailOpen] = useState(false);
-  const [isPopulationModalOpen, setIsPopulationModalOpen] = useState(false);
-  const [eventEntryType, setEventEntryType] = useState<'Ayam Masuk' | 'Afkir'>('Ayam Masuk');
-  const [isSubmittingPopulation, setIsSubmittingPopulation] = useState(false);
+  const [isAfkirModalOpen, setIsAfkirModalOpen] = useState(false);
 
   // Payment
   const [invoiceModalMode, setInvoiceModalMode] = useState<'bayar' | 'detail' | null>(null);
@@ -246,6 +258,15 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [billingMode, setBillingMode] = useState<'telur' | 'pakan'>('telur');
   const [billingSubMode, setBillingSubMode] = useState<'piutang' | 'hutang'>('piutang');
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
+  
+  // Afkir
+  const [afkirDate, setAfkirDate] = useState(new Date().toISOString().split('T')[0]);
+  const [afkirQty, setAfkirQty] = useState<number>(0);
+  const [afkirWeight, setAfkirWeight] = useState<number>(0);
+  const [afkirPrice, setAfkirPrice] = useState<number>(0);
+  const [afkirNotes, setAfkirNotes] = useState<string>('');
+  const [afkirMitra, setAfkirMitra] = useState<string>('');
+  const [isSubmittingAfkir, setIsSubmittingAfkir] = useState(false);
 
   // Data Hooks
   const {
@@ -254,11 +275,13 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     eggStock,
     eggTransactions,
     feedTransactions,
+    afkirTransactions,
     paymentHistory,
     fetchFeedMaster,
     fetchEggStock,
     fetchEggTransactions,
     fetchFeedTransactions,
+    fetchAfkirTransactions,
     fetchPaymentHistory
   } = useSupabaseData(supabase);
 
@@ -274,7 +297,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     financialData,
     dashboardStats,
     recentCombinedActivities
-  } = useFinancialEngine(eggTransactions, feedTransactions, eggStock, feedItems);
+  } = useFinancialEngine(eggTransactions, feedTransactions, afkirTransactions, eggStock, feedItems);
 
   // Handlers
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -436,14 +459,45 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [mitraName, feedCart, feedModalType, feedDate, feedCartTotal, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, supabase]);
 
-  const handleSubmitPopulation = useCallback(async () => {
-    setIsSubmittingPopulation(true);
-    setTimeout(() => {
-      setIsSubmittingPopulation(false);
-      setIsPopulationModalOpen(false);
-      showToast('Berhasil mencatat kejadian populasi');
-    }, 1000);
-  }, [showToast]);
+
+  const handleSubmitAfkir = useCallback(async () => {
+    if (afkirQty <= 0 || !afkirMitra) {
+      showToast('Mohon lengkapi data afkir', 'error');
+      return;
+    }
+    setIsSubmittingAfkir(true);
+    try {
+      if (supabase) {
+        const totalHarga = afkirQty * afkirPrice;
+        const { error } = await supabase
+          .from('transaksi_afkir')
+          .insert([{
+            tanggal: afkirDate,
+            mitra_name: afkirMitra,
+            qty_ekor: afkirQty,
+            berat_total_kg: 0, // No longer used in UI
+            harga_per_satuan: afkirPrice,
+            total_harga: totalHarga,
+            keterangan: afkirNotes,
+            jumlah_dibayar: totalHarga, // Asumsi bayar tunai
+          }]);
+
+        if (error) throw error;
+        await fetchAfkirTransactions();
+        showToast('Berhasil mencatat penjualan ayam afkir');
+        setIsAfkirModalOpen(false);
+        setAfkirNotes('');
+        setAfkirQty(0);
+        setAfkirPrice(0);
+        setAfkirMitra('');
+      }
+    } catch (err: any) {
+      console.error('Error submitting afkir:', err);
+      showToast(err.message || 'Gagal menyimpan data afkir', 'error');
+    } finally {
+      setIsSubmittingAfkir(false);
+    }
+  }, [afkirQty, afkirMitra, afkirPrice, afkirDate, afkirNotes, supabase, fetchAfkirTransactions, showToast, setIsAfkirModalOpen]);
 
   const formatMoney = useCallback((amount: number, short: boolean = false) => {
     if (short && amount >= 1000000) {
@@ -603,8 +657,9 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       fetchEggStock();
       fetchEggTransactions();
       fetchFeedTransactions();
+      fetchAfkirTransactions();
     }
-  }, [supabase, fetchFeedMaster, fetchEggStock, fetchEggTransactions, fetchFeedTransactions]);
+  }, [supabase, fetchFeedMaster, fetchEggStock, fetchEggTransactions, fetchFeedTransactions, fetchAfkirTransactions]);
 
   // Refresh stock on modal open
   useEffect(() => {
@@ -613,6 +668,19 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       fetchFeedMaster();
     }
   }, [eggModalType, feedModalType, fetchEggStock, fetchFeedMaster]);
+
+  // Fetch payment history when detail modals open
+  useEffect(() => {
+    if (isEggDetailOpen && selectedEggDetail?.id) {
+      fetchPaymentHistory(selectedEggDetail.id);
+    }
+  }, [isEggDetailOpen, selectedEggDetail, fetchPaymentHistory]);
+
+  useEffect(() => {
+    if (isFeedDetailOpen && selectedFeedDetail?.id) {
+      fetchPaymentHistory(selectedFeedDetail.id);
+    }
+  }, [isFeedDetailOpen, selectedFeedDetail, fetchPaymentHistory]);
 
   const isLoading = isDataLoading && user !== null;
 
@@ -694,12 +762,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setSelectedFeedDetail,
     isFeedDetailOpen,
     setIsFeedDetailOpen,
-    isPopulationModalOpen,
-    setIsPopulationModalOpen,
-    eventEntryType,
-    setEventEntryType,
-    isSubmittingPopulation,
-    handleSubmitPopulation,
+    isAfkirModalOpen,
+    setIsAfkirModalOpen,
     invoiceModalMode,
     setInvoiceModalMode,
     selectedInvoice,
@@ -727,6 +791,24 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setBillingMode,
     billingSubMode,
     setBillingSubMode,
+    billingSubMode,
+    setBillingSubMode,
+    afkirTransactions,
+    afkirDate,
+    setAfkirDate,
+    afkirQty,
+    setAfkirQty,
+    afkirWeight,
+    setAfkirWeight,
+    afkirPrice,
+    setAfkirPrice,
+    afkirNotes,
+    setAfkirNotes,
+    afkirMitra,
+    setAfkirMitra,
+    isSubmittingAfkir,
+    handleSubmitAfkir,
+    fetchAfkirTransactions,
     formatMoney,
     setNotification,
     confirmModal,

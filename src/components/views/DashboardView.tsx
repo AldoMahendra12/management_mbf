@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { SectionContainer } from '../layout/SectionContainer';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { useDashboard } from '../../contexts/DashboardContext';
 
@@ -89,11 +90,14 @@ export function DashboardView() {
     if (type.includes('beli pakan') || type.includes('pakan_masuk') || type.includes('tambah stok')) return 'Beli Pakan';
     if (type.includes('jual telur') || act.source === 'Telur') return 'Jual Telur';
     if (type.includes('beli telur')) return 'Beli Telur';
-    return act.jenis_transaksi;
+    return act.jenis_transaksi || 'Aktivitas';
   };
 
   // Activity detail helper
   const getActivityDetail = (act: any) => {
+    if (act.source === 'Afkir' || act.jenis_transaksi?.toLowerCase().includes('afkir')) {
+      return `${act.qty_ekor || 0} Ekor Ayam`;
+    }
     if (act.source === 'Telur') {
       return `${act.jumlah_kg || act.total_kg || 0} kg Telur`;
     }
@@ -342,14 +346,14 @@ export function DashboardView() {
                   <div className="col-span-2 flex items-center gap-3">
                     <div className={cn(
                       "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
-                      getActivityName(act).includes('Jual') ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"
+                      getActivityName(act)?.includes('Jual') ? "bg-emerald-50 text-emerald-600" : "bg-blue-50 text-blue-600"
                     )}>
                       <IconComponent size={15} />
                     </div>
                     <div className="min-w-0">
                       <p className={cn(
                         "text-xs font-black uppercase tracking-tight truncate",
-                        getActivityName(act).includes('Jual') ? "text-emerald-600" : "text-blue-600"
+                        getActivityName(act)?.includes('Jual') ? "text-emerald-600" : "text-blue-600"
                       )}>
                         {getActivityName(act)}
                       </p>

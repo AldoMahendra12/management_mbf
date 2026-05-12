@@ -58,7 +58,7 @@ export default function App() {
       case 'Beranda': return <DashboardView />;
       case 'Gudang Telur': return <EggWarehouseView />;
       case 'Gudang Pakan': return <FeedWarehouseView />;
-      case 'Populasi': return <PopulationView />;
+      case 'Afkir': return <PopulationView />;
       case 'Tagihan': return <BillingView />;
       case 'Keuangan': return <FinanceView />;
       case 'Ekspor': return <ExportView />;

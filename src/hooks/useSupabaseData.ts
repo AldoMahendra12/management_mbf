@@ -21,6 +21,9 @@ export const useSupabaseData = (supabase: any) => {
   const [eggTransactions, setEggTransactions] = useState<any[]>([]);
   const [isLoadingEggs, setIsLoadingEggs] = useState(false);
   
+  const [afkirTransactions, setAfkirTransactions] = useState<any[]>([]);
+  const [isLoadingAfkir, setIsLoadingAfkir] = useState(false);
+  
   const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
   const fetchFeedMaster = useCallback(async () => {
@@ -134,6 +137,31 @@ export const useSupabaseData = (supabase: any) => {
     }
   }, [supabase]);
 
+  const fetchAfkirTransactions = useCallback(async () => {
+    setIsLoadingAfkir(true);
+    if (!supabase) {
+        setIsLoadingAfkir(false);
+        return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('transaksi_afkir')
+        .select('*')
+        .order('tanggal', { ascending: false });
+
+      if (error) {
+        // Table may not exist, use mock data
+        setAfkirTransactions([]);
+      } else {
+        setAfkirTransactions(data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching afkir transactions:', err);
+    } finally {
+      setIsLoadingAfkir(false);
+    }
+  }, [supabase]);
+
   const fetchPaymentHistory = useCallback(async (transaksi_id: string) => {
     if (!supabase) return;
     try {
@@ -164,6 +192,7 @@ export const useSupabaseData = (supabase: any) => {
     eggStock, fetchEggStock,
     feedTransactions, fetchFeedTransactions, isLoadingFeedTrx,
     eggTransactions, fetchEggTransactions, isLoadingEggs,
+    afkirTransactions, fetchAfkirTransactions, isLoadingAfkir,
     paymentHistory, fetchPaymentHistory, setPaymentHistory,
     isLoading
   };

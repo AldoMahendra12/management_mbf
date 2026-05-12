@@ -7,8 +7,20 @@ import {
   ArrowDownLeft,
   CalendarDays,
   X,
-  PieChart
+  PieChart,
+  Users,
+  Search,
+  ArrowRightLeft
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SectionContainer } from '../layout/SectionContainer';
 import { cn } from '@/lib/utils';
@@ -72,12 +84,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 };
 
 export function FinanceView() {
-  const { eggTransactions, feedTransactions, formatMoney } = useDashboard();
+  const { eggTransactions, feedTransactions, afkirTransactions, formatMoney } = useDashboard();
 
   const [rangeMode, setRangeMode] = useState<DateRangeMode>('bulan');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
   const [detailModal, setDetailModal] = useState<'masuk' | 'keluar' | 'net' | null>(null);
+  const [mitraSearch, setMitraSearch] = useState('');
 
   const { start, end } = useMemo(
     () => getDateBounds(rangeMode, customStart, customEnd),
@@ -97,8 +110,14 @@ export function FinanceView() {
       return d >= start && d <= end;
     }), [feedTransactions, start, end]);
 
+  const filteredAfkir = useMemo(() =>
+    afkirTransactions.filter(t => {
+      const d = new Date(t.tanggal || t.created_at);
+      return d >= start && d <= end;
+    }), [afkirTransactions, start, end]);
+
   // Section A: Summary cards breakdown
-  const { eggIn, feedIn, eggOut, feedOut } = useMemo(() => {
+  const { eggIn, feedIn, eggOut, feedOut, afkirIn } = useMemo(() => {
     const eIn = filteredEgg
       .filter(t => {
         const j = t.jenis_transaksi?.toLowerCase() || '';
@@ -125,10 +144,13 @@ export function FinanceView() {
       })
       .reduce((s, t) => s + (t.total_tagihan || 0), 0);
 
-    return { eggIn: eIn, feedIn: fIn, eggOut: eOut, feedOut: fOut };
-  }, [filteredEgg, filteredFeed]);
+    const aIn = filteredAfkir
+      .reduce((s, t) => s + (t.total_harga || 0), 0);
 
-  const totalMasuk = eggIn + feedIn;
+    return { eggIn: eIn, feedIn: fIn, eggOut: eOut, feedOut: fOut, afkirIn: aIn };
+  }, [filteredEgg, filteredFeed, filteredAfkir]);
+
+  const totalMasuk = eggIn + feedIn + afkirIn;
   const totalKeluar = eggOut + feedOut;
   const net = totalMasuk - totalKeluar;
 
@@ -171,11 +193,57 @@ export function FinanceView() {
       }
     });
 
+    filteredAfkir.forEach(t => {
+      const dateKey = (t.tanggal || t.created_at || '').substring(0, 10);
+      if (!dateMap[dateKey]) return;
+      dateMap[dateKey].masuk += t.total_harga || 0;
+    });
+
     return Object.values(dateMap).map(row => ({
       ...row,
       label: formatDateLabel(row.tanggal),
     }));
   }, [filteredEgg, filteredFeed, start, end]);
+
+  // Section C: Mitra Recap Table
+  const mitraRecap = useMemo(() => {
+    const recapMap: Record<string, { name: string; income: number; expense: number; count: number }> = {};
+
+    const process = (trx: any, amount: number, isIncome: boolean) => {
+      const name = (trx.nama_mitra || trx.keterangan?.replace('Mitra: ', '') || 'Pelanggan Umum').split('|')[0].trim();
+      if (!recapMap[name]) {
+        recapMap[name] = { name, income: 0, expense: 0, count: 0 };
+      }
+      if (isIncome) recapMap[name].income += amount;
+      else recapMap[name].expense += amount;
+      recapMap[name].count += 1;
+    };
+
+    filteredEgg.forEach(t => {
+      const jt = t.jenis_transaksi?.toLowerCase() || '';
+      const isInc = jt === 'jual telur' || jt === 'jual ke luar';
+      process(t, t.total_harga || 0, isInc);
+    });
+
+    filteredFeed.forEach(t => {
+      const jt = t.jenis_transaksi?.toLowerCase() || '';
+      const isInc = jt === 'jual pakan' || jt === 'keluar';
+      process(t, t.total_tagihan || 0, isInc);
+    });
+
+    filteredAfkir.forEach(t => {
+      process(t, t.total_harga || 0, true);
+    });
+
+    let results = Object.values(recapMap).sort((a, b) => (b.income + b.expense) - (a.income + a.expense));
+    
+    if (mitraSearch) {
+      const q = mitraSearch.toLowerCase();
+      results = results.filter(r => r.name.toLowerCase().includes(q));
+    }
+
+    return results;
+  }, [filteredEgg, filteredFeed, mitraSearch]);
 
 
   const rangeModes: { key: DateRangeMode; label: string }[] = [
@@ -388,6 +456,102 @@ export function FinanceView() {
         </CardContent>
       </Card>
 
+      {/* Section C — Mitra Recap Table */}
+      <div className="bg-white border border-slate-200/60 rounded-xl shadow-sm overflow-hidden">
+        <div className="px-10 py-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
+              <Users size={20} />
+            </div>
+            <div>
+              <h3 className="text-base font-black text-slate-800 tracking-tight uppercase">Rekapitulasi per Pelanggan</h3>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Total perputaran uang berdasarkan mitra</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg flex items-center gap-2 focus-within:border-orange-300 transition-colors">
+              <Search size={12} className="text-slate-400" />
+              <input 
+                type="text" 
+                value={mitraSearch}
+                onChange={(e) => setMitraSearch(e.target.value)}
+                placeholder="Cari pelanggan..." 
+                className="text-[10px] font-bold outline-none bg-transparent w-32 placeholder:text-slate-300"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-50/50">
+              <TableRow className="hover:bg-transparent border-slate-100">
+                <TableHead className="pl-10 h-12 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Pelanggan</TableHead>
+                <TableHead className="h-12 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-center">Aktivitas</TableHead>
+                <TableHead className="h-12 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-right">Uang Masuk</TableHead>
+                <TableHead className="h-12 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-right">Uang Keluar</TableHead>
+                <TableHead className="pr-10 h-12 text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] text-right">Saldo Bersih</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {mitraRecap.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={5} className="h-32 text-center">
+                    <p className="text-[10px] font-black text-slate-300 uppercase tracking-widest">Tidak ada data untuk periode ini</p>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                mitraRecap.map((row, i) => {
+                  const netMitra = row.income - row.expense;
+                  return (
+                    <TableRow key={i} className="group hover:bg-slate-50/50 transition-colors border-slate-50">
+                      <TableCell className="pl-10 py-4">
+                        <span className="text-xs font-black text-slate-900 uppercase tracking-tight">{row.name}</span>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[9px] font-black text-slate-500 uppercase">
+                          {row.count} Trx
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="text-xs font-black text-emerald-600 tabular-nums">
+                          {formatMoney(row.income)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <span className="text-xs font-black text-blue-600 tabular-nums">
+                          {formatMoney(row.expense)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="pr-10 text-right">
+                        <div className={cn(
+                          "inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-[10px] font-black tabular-nums shadow-sm border",
+                          netMitra >= 0 
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-100" 
+                            : "bg-red-50 text-red-600 border-red-100"
+                        )}>
+                          {netMitra >= 0 ? '+' : ''}{formatMoney(netMitra)}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+        
+        <div className="px-10 py-4 bg-slate-50/30 border-t border-slate-50 flex justify-between items-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+            Menampilkan {mitraRecap.length} pelanggan dalam periode ini
+          </p>
+          <div className="flex items-center gap-1">
+             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Data Terverifikasi</span>
+          </div>
+        </div>
+      </div>
+
       {/* Detail Modal */}
       {detailModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -435,6 +599,10 @@ export function FinanceView() {
                     <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
                       <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Penjualan Pakan</span>
                       <span className="font-black text-green-600">{formatMoney(feedIn)}</span>
+                    </div>
+                    <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                      <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Penjualan Afkir</span>
+                      <span className="font-black text-green-600">{formatMoney(afkirIn)}</span>
                     </div>
                     <div className="pt-2 flex items-center justify-between border-t border-slate-100">
                       <span className="text-xs font-black text-slate-900 uppercase tracking-widest">Total Masuk</span>

@@ -19,5 +19,3 @@ Sistem manajemen operasional dan keuangan terintegrasi yang dirancang khusus unt
 2. Set the `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in [.env](.env)
 3. Run the app:
    `npm run dev`
-
-View your app in AI Studio: https://ai.studio/apps/586e5b00-810e-4589-9df5-73a08bef948d

@@ -199,7 +199,15 @@ export function ExportView() {
         <CardContent className="p-4 md:p-12 bg-slate-100/50 flex flex-col items-center w-full">
             <div className="w-full flex justify-center overflow-hidden py-4 min-h-[300px] md:min-h-0">
               <div className="origin-top transition-transform duration-500 scale-[0.4] sm:scale-[0.6] md:scale-100 mb-[-650px] sm:mb-[-400px] md:mb-0" style={{ width: '800px' }}>
-                <div id="print-preview" ref={printRefLaporan} className="bg-white w-[800px] min-h-[1100px] shadow-2xl shadow-slate-200 p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200">
+                <div id="print-preview" ref={printRefLaporan} className="bg-white w-[800px] h-auto min-h-[500px] shadow-2xl shadow-slate-200 p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200 relative">
+                  {/* Continuous Form Perforation Effect (Optional/Aesthetic) */}
+                  <div className="absolute left-2 top-0 bottom-0 w-4 flex flex-col justify-around py-4 gap-4 opacity-10">
+                    {[...Array(20)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-slate-900" />)}
+                  </div>
+                  <div className="absolute right-2 top-0 bottom-0 w-4 flex flex-col justify-around py-4 gap-4 opacity-10">
+                    {[...Array(20)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-slate-900" />)}
+                  </div>
+
               {/* Official Letterhead */}
               <div className="flex items-center justify-between border-b-[3px] border-slate-900 pb-8">
                   <div className="flex gap-6 items-center">

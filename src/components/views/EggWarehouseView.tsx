@@ -173,13 +173,13 @@ export function EggWarehouseView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
         {[
           { label: 'Total Beli Telur', val: `${totalMasukEgg.toLocaleString('id-ID')} kg`, sub: 'Total telur diterima dari kandang' },
           { label: 'Total Jual Telur', val: `${totalKeluarEgg.toLocaleString('id-ID')} kg`, sub: 'Total telur terjual ke mitra' },
           { label: 'Stok Gudang Telur', val: `${((eggStock?.horn || 0) + (eggStock?.arab || 0)).toLocaleString('id-ID')} kg`, sub: 'Sisa stok telur di gudang' },
         ].map((card, i) => (
-          <div key={i} className="card-premium p-6 flex flex-col justify-between h-[140px]">
+          <div key={i} className="card-premium p-4 md:p-6 flex flex-col justify-between h-auto md:h-[140px] min-w-0">
              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.label}</p>
              <div>
                <h3 className="text-2xl font-black text-slate-900 tracking-tighter tabular-nums">{card.val}</h3>
@@ -189,7 +189,7 @@ export function EggWarehouseView() {
         ))}
       </div>
 
-      <div className="card-premium overflow-hidden border border-slate-200/60 shadow-sm flex flex-col">
+      <div className="card-premium overflow-hidden border border-slate-200/60 shadow-sm flex flex-col min-w-0">
         <div className="bg-white px-6 md:px-10 py-8 border-b border-slate-100 flex flex-col gap-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -272,7 +272,7 @@ export function EggWarehouseView() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto w-full min-w-0">
         <Table>
           <TableHeader className="bg-slate-50/50">
             <TableRow className="border-slate-100 hover:bg-transparent">

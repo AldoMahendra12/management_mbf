@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useDashboard } from '@/contexts/DashboardContext';
+import { OCRUpload } from '@/components/ui/OCRUpload';
+import { OCRResult } from '@/lib/gemini';
 
 export const EggTransactionModal: React.FC = () => {
   const {
@@ -145,7 +147,19 @@ export const EggTransactionModal: React.FC = () => {
               </div>
             </motion.div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-8">
+              {/* AI OCR Section */}
+              <OCRUpload 
+                type="egg" 
+                onSuccess={(data: OCRResult) => {
+                  if (data.tanggal) setEggDate(data.tanggal);
+                  if (data.nama_mitra) setMitraName(data.nama_mitra);
+                  if (data.harga_per_kg) setEggPrice(data.harga_per_kg);
+                  // Optionally handle jumlah_kg if needed, though usually eggQty is calculated from eggIkat
+                }}
+              />
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Date Section */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">

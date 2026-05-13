@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { useDashboard } from '@/contexts/DashboardContext';
+import { OCRUpload } from '@/components/ui/OCRUpload';
 
 export const FeedTransactionModal: React.FC = () => {
   const {
@@ -27,7 +28,8 @@ export const FeedTransactionModal: React.FC = () => {
     feedDate,
     setFeedDate,
     showToast,
-    showAlert
+    showAlert,
+    handleOCRFeedResult
   } = useDashboard();
 
   const [showConfirm, setShowConfirm] = React.useState(false);
@@ -150,6 +152,13 @@ export const FeedTransactionModal: React.FC = () => {
             </motion.div>
           ) : (
             <div className="space-y-8">
+              {/* AI OCR Section */}
+              <OCRUpload 
+                type="feed" 
+                onSuccess={handleOCRFeedResult}
+              />
+
+              <div className="space-y-8">
               {/* Top Info Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">

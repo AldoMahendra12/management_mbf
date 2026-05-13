@@ -269,10 +269,10 @@ export function DashboardView() {
       </div>
 
       {/* ===== TASK 2: Top Overview Cards (4 Columns) ===== */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-5">
         {/* Card 1: Total Piutang */}
         <div className="bg-white border border-slate-200/50 rounded-xl flex flex-col justify-between group cursor-pointer hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 shadow-sm transition-all duration-500 overflow-hidden" onClick={() => setActiveTab('Tagihan')}>
-          <div className="p-6 pb-5">
+          <div className="p-4 md:p-6 pb-4 md:pb-5">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Piutang</p>
             <h3 className={cn("font-black text-slate-900 mt-3 tracking-tighter tabular-nums", (dashboardStats?.piutang || 0) >= 1000000 ? "text-xl" : "text-2xl")}>{formatMoney(dashboardStats?.piutang || 0)}</h3>
             <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Sisa tagihan aktif</p>
@@ -296,7 +296,7 @@ export function DashboardView() {
 
         {/* Card 2: Total Utang */}
         <div className="bg-white border border-slate-200/50 rounded-xl flex flex-col justify-between group cursor-pointer hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 shadow-sm transition-all duration-500 overflow-hidden" onClick={() => setActiveTab('Tagihan')}>
-          <div className="p-6 pb-5">
+          <div className="p-4 md:p-6 pb-4 md:pb-5">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Utang</p>
             <h3 className={cn("font-black text-slate-900 mt-3 tracking-tighter tabular-nums", (dashboardStats?.hutang || 0) >= 1000000 ? "text-xl" : "text-2xl")}>{formatMoney(dashboardStats?.hutang || 0)}</h3>
             <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Kewajiban ke mitra</p>
@@ -320,7 +320,7 @@ export function DashboardView() {
 
         {/* Card 3: Stok Telur */}
         <div className="bg-white border border-slate-200/50 rounded-xl flex flex-col justify-between group cursor-pointer hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 shadow-sm transition-all duration-500 overflow-hidden" onClick={() => setActiveTab('Gudang Telur')}>
-          <div className="p-6 pb-5">
+          <div className="p-4 md:p-6 pb-4 md:pb-5">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Telur</p>
             <h3 className="font-black text-slate-900 mt-3 tracking-tighter tabular-nums text-2xl">
               {dashboardStats.stokTelur.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span>
@@ -349,7 +349,7 @@ export function DashboardView() {
           "bg-white border border-slate-200/50 rounded-xl flex flex-col justify-between group cursor-pointer transition-all duration-500 overflow-hidden hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1",
           dashboardStats.criticalFeed > 0 ? "shadow-lg shadow-red-500/10 border-red-100" : "shadow-sm"
         )} onClick={() => setActiveTab('Gudang Pakan')}>
-          <div className="p-6 pb-5">
+          <div className="p-4 md:p-6 pb-4 md:pb-5">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pakan Kritis</p>
             <h3 className="font-black text-slate-900 mt-3 tracking-tighter tabular-nums text-2xl">
               {dashboardStats.criticalFeed} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">item</span>
@@ -375,7 +375,7 @@ export function DashboardView() {
       </div>
 
       {/* ===== TASK 3: Middle Section - Wallet-style Piutang & Utang ===== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-5">
         {/* Left: Review Piutang Terbesar */}
         <div className="bg-white border border-slate-200/50 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-300">
           <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100/60">
@@ -482,12 +482,12 @@ export function DashboardView() {
       </div>
 
       {/* ===== TASK 4: Bottom - Recent Activities Table ===== */}
-      <div className="bg-white border border-slate-200/50 rounded-xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-slate-200/50 rounded-xl overflow-hidden shadow-sm flex flex-col min-w-0">
         <div className="px-5 py-4 flex items-center justify-between border-b border-slate-100/60">
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Aktivitas Terbaru</h3>
         </div>
 
-        <div className="overflow-x-auto min-w-full">
+        <div className="overflow-x-auto w-full min-w-0">
           <div className="min-w-[800px]">
 
         {/* Table Header */}

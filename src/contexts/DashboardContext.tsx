@@ -169,6 +169,7 @@ interface DashboardContextType {
 
   // Utility
   formatMoney: (amount: number, short?: boolean) => string;
+  handleOCRFeedResult: (data: any) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -468,6 +469,33 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [mitraName, feedCart, feedModalType, feedDate, feedCartTotal, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, supabase, isSandbox]);
 
+
+  const handleOCRFeedResult = useCallback((data: any) => {
+    if (data.nama_mitra) setMitraName(data.nama_mitra);
+    if (data.tanggal) {
+      // Ensure date format is YYYY-MM-DD
+      try {
+        const d = new Date(data.tanggal);
+        if (!isNaN(d.getTime())) {
+          setFeedDate(d.toISOString().split('T')[0]);
+        }
+      } catch (e) {}
+    }
+    if (data.items && data.items.length > 0) {
+      const newCart = data.items.map((item: any) => {
+        const matched = feedItems.find(f => 
+          f.nama_bahan.toLowerCase().includes(item.nama_bahan.toLowerCase()) ||
+          item.nama_bahan.toLowerCase().includes(f.nama_bahan.toLowerCase())
+        );
+        return {
+          id_bahan: matched ? String(matched.id) : '',
+          qty: item.qty || 0,
+          harga_per_satuan: item.harga || 0
+        };
+      });
+      setFeedCart(newCart);
+    }
+  }, [feedItems]);
 
   const handleSubmitAfkir = useCallback(async () => {
     if (afkirQty <= 0 || !afkirMitra) {
@@ -915,6 +943,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     handleSubmitAfkir,
     fetchAfkirTransactions,
     formatMoney,
+    handleOCRFeedResult,
     setNotification,
     confirmModal,
     setConfirmModal,

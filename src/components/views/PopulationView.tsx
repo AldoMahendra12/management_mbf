@@ -108,7 +108,7 @@ export function PopulationView() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto w-full min-w-0">
         <Table>
               <TableHeader>
                 <TableRow className="border-b-2 border-slate-100 hover:bg-transparent">

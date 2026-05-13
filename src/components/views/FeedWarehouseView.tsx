@@ -185,7 +185,7 @@ export function FeedWarehouseView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 relative">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 relative">
         {isLoading && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-[2px] rounded-xl">
              <div className="flex flex-col items-center gap-3">
@@ -204,7 +204,7 @@ export function FeedWarehouseView() {
 
           return (
             <div key={i} className={cn(
-              "card-premium p-4 flex flex-col justify-between group transition-all cursor-default hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1",
+              "card-premium p-3 md:p-4 flex flex-col justify-between group transition-all cursor-default hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 min-w-0",
               isKritis ? "border-red-200/60 bg-red-50/10 shadow-lg shadow-red-500/20" : 
               isMenipis ? "border-amber-200/60 bg-amber-50/10 shadow-lg shadow-amber-500/20" : ""
             )}>
@@ -212,8 +212,8 @@ export function FeedWarehouseView() {
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.nama_bahan}</p>
                 <Package size={14} className={cn("text-slate-300", isMenipis && !isKritis ? "text-amber-500" : isKritis ? "text-red-500" : "text-green-500")} />
               </div>
-              <div className="mt-4 mb-2">
-                <h4 className="text-2xl font-black text-slate-900 leading-none">{card.stok_sekarang} <span className="text-[10px] font-bold text-slate-400 ml-1">{card.satuan}</span></h4>
+              <div className="mt-2 md:mt-4 mb-2">
+                <h4 className="text-xl md:text-2xl font-black text-slate-900 leading-none">{card.stok_sekarang} <span className="text-[10px] font-bold text-slate-400 ml-1">{card.satuan}</span></h4>
               </div>
               <div className="space-y-3">
                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -241,7 +241,7 @@ export function FeedWarehouseView() {
         })}
       </div>
 
-      <div className="card-premium overflow-hidden border border-slate-200/60 shadow-sm flex flex-col">
+      <div className="card-premium overflow-hidden border border-slate-200/60 shadow-sm flex flex-col min-w-0">
         <div className="bg-white px-6 md:px-10 py-8 border-b border-slate-100 flex flex-col gap-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
@@ -324,7 +324,7 @@ export function FeedWarehouseView() {
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto w-full min-w-0">
         <Table>
           <TableHeader className="bg-slate-50/50">
             <TableRow className="border-slate-100 hover:bg-transparent">

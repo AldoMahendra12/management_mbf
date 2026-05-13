@@ -296,7 +296,7 @@ export function BillingView() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0 overflow-x-auto">
+                <CardContent className="p-0 overflow-x-auto w-full min-w-0">
                   <Table>
                     <TableHeader className="bg-slate-50/30">
                       <TableRow className="border-slate-100">
@@ -649,7 +649,7 @@ export function BillingView() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0 overflow-x-auto">
+                <CardContent className="p-0 overflow-x-auto w-full min-w-0">
                   <Table>
                     <TableHeader className="bg-slate-50/30">
                       <TableRow className="border-slate-100">

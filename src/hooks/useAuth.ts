@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 
-// 24 Jam dalam milidetik (24 * 60 * 60 * 1000)
-const SESSION_TIMEOUT = 24 * 60 * 60 * 1000;
-const SESSION_KEY = 'mbf_login_timestamp';
+// 2 Jam dalam milidetik (2 * 60 * 60 * 1000)
+const INACTIVITY_TIMEOUT = 2 * 60 * 60 * 1000;
+const LAST_ACTIVE_KEY = 'mbf_last_active';
 
 export const useAuth = () => {
   const [session, setSession] = useState<any>(null);
@@ -12,29 +12,36 @@ export const useAuth = () => {
   const [isAuthLoading, setIsAuthLoading] = useState(true);
 
   const handleLogout = async () => {
-    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(LAST_ACTIVE_KEY);
     localStorage.removeItem('mbf_sandbox_user');
     if (supabase) await supabase.auth.signOut();
     window.location.href = '/';
   };
 
   useEffect(() => {
-    // 1. Cek Timeout Login (24 Jam)
-    const checkTimeout = () => {
-      const loginTime = localStorage.getItem(SESSION_KEY);
-      if (loginTime) {
+    // 1. Cek Inaktivitas (Jika tab ditutup > 2 jam)
+    const checkInactivity = () => {
+      const lastActive = localStorage.getItem(LAST_ACTIVE_KEY);
+      if (lastActive) {
         const now = Date.now();
-        if (now - parseInt(loginTime) > SESSION_TIMEOUT) {
+        if (now - parseInt(lastActive) > INACTIVITY_TIMEOUT) {
           handleLogout();
           return true;
         }
       }
+      // Update waktu aktif sekarang
+      localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
       return false;
     };
 
-    if (checkTimeout()) return;
+    if (checkInactivity()) return;
 
-    // 2. Check for sandbox user
+    // 2. Interval untuk update status "Aktif" (Selama tab terbuka)
+    const activeInterval = setInterval(() => {
+      localStorage.setItem(LAST_ACTIVE_KEY, Date.now().toString());
+    }, 30000); // Update setiap 30 detik
+
+    // 3. Check for sandbox user
     const sandboxUser = localStorage.getItem('mbf_sandbox_user');
     if (sandboxUser) {
       const data = JSON.parse(sandboxUser);
@@ -42,11 +49,6 @@ export const useAuth = () => {
       setUserRole('editor');
       setUserDisplayName(data.name || 'User Trial');
       setIsAuthLoading(false);
-      
-      // Jika sandbox baru login dan belum ada timestamp, set sekarang
-      if (!localStorage.getItem(SESSION_KEY)) {
-        localStorage.setItem(SESSION_KEY, Date.now().toString());
-      }
       return;
     }
 
@@ -78,13 +80,8 @@ export const useAuth = () => {
     // Initial check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) {
-        // Jika session ada tapi timestamp tidak ada, set (baru login)
-        if (!localStorage.getItem(SESSION_KEY)) {
-          localStorage.setItem(SESSION_KEY, Date.now().toString());
-        }
-        fetchUserRole(session.user.id);
-      } else {
+      if (session) fetchUserRole(session.user.id);
+      else {
         setTimeout(() => setIsAuthLoading(false), 1000);
       }
     });
@@ -92,27 +89,19 @@ export const useAuth = () => {
     // Auth listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setSession(session);
-      
       if (session) {
-        // Set timestamp saat login baru atau session awal terdeteksi
-        if (!localStorage.getItem(SESSION_KEY)) {
-          localStorage.setItem(SESSION_KEY, Date.now().toString());
-        }
         fetchUserRole(session.user.id);
       } else {
-        // Hapus timestamp saat logout
-        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(LAST_ACTIVE_KEY);
         setUserRole(null);
         setTimeout(() => setIsAuthLoading(false), 1000);
       }
-
-      // Jika session expired dari sisi Supabase, pastikan timeout local juga bersih
-      if (event === 'SIGNED_OUT') {
-        localStorage.removeItem(SESSION_KEY);
-      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearInterval(activeInterval);
+      subscription.unsubscribe();
+    };
   }, []);
 
   return { 

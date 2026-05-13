@@ -169,12 +169,12 @@ export function DashboardView() {
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">
             Assalamu'alaikum, {formattedName}
             <motion.span 
               animate={{ rotate: [0, 15, -10, 15, 0] }}
               transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-              className="inline-block origin-bottom-right"
+              className="inline-block origin-bottom-right ml-2"
             >
               👋
             </motion.span>

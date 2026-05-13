@@ -90,7 +90,7 @@ export function ExportView() {
       <div className="flex items-center justify-between bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Ekspor Data</h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Unduh laporan operasional dan finansial untuk arsip</p>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Unduh laporan operasional dan finansial untuk arsip</p>
         </div>
         
 
@@ -99,7 +99,7 @@ export function ExportView() {
       </div>
 
       {/* Financial Report Entity Selection */}
-      <div className="grid grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
         {[
           { 
             title: 'Laporan Keuangan PT MBF', 
@@ -196,9 +196,9 @@ export function ExportView() {
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="p-12 bg-slate-100/50 flex flex-col items-center">
+        <CardContent className="p-4 md:p-12 bg-slate-100/50 flex flex-col items-center overflow-x-auto w-full min-w-0">
             {/* A4 Paper Preview */}
-            <div id="print-preview" ref={printRefLaporan} className="bg-white w-full max-w-[800px] min-h-[1100px] shadow-2xl shadow-slate-200 p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200">
+            <div id="print-preview" ref={printRefLaporan} className="bg-white w-full min-w-[800px] md:min-w-0 md:max-w-[800px] min-h-[1100px] shadow-2xl shadow-slate-200 p-8 md:p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200">
               {/* Official Letterhead */}
               <div className="flex items-center justify-between border-b-[3px] border-slate-900 pb-8">
                   <div className="flex gap-6 items-center">
@@ -363,7 +363,7 @@ export function ExportView() {
         <CardHeader className="bg-slate-50/50 border-b border-slate-100 px-8 py-5">
           <CardTitle className="text-base font-black text-slate-800 uppercase tracking-tight">Riwayat Ekspor</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-0 overflow-x-auto w-full min-w-0">
           <Table>
             <TableHeader className="bg-slate-50/30">
               <TableRow className="border-slate-100">

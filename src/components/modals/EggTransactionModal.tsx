@@ -281,6 +281,7 @@ export const EggTransactionModal: React.FC = () => {
                   className="w-full bg-white border border-slate-100 rounded-xl p-4 text-sm font-black text-slate-900 outline-none focus:border-orange-200 focus:ring-4 focus:ring-orange-500/5 transition-all placeholder:text-slate-300 resize-none shadow-sm" 
                 />
               </div>
+              </div>
             </div>
           )}
         </div>

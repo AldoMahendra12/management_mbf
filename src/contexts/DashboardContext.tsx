@@ -200,6 +200,12 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [isSubmittingFeed, setIsSubmittingFeed] = useState(false);
   const [feedNotes, setFeedNotes] = useState<string>('');
 
+  // --- SANDBOX STATES (In-Memory for Trial Users) ---
+  const [sandboxEggTransactions, setSandboxEggTransactions] = useState<any[]>([]);
+  const [sandboxFeedTransactions, setSandboxFeedTransactions] = useState<any[]>([]);
+  const [sandboxAfkirTransactions, setSandboxAfkirTransactions] = useState<any[]>([]);
+  const [sandboxFeedStockAdjustments, setSandboxFeedStockAdjustments] = useState<Record<string, number>>({});
+
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -289,6 +295,50 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setFeedTransactions
   } = useSupabaseData(supabase);
 
+  // --- MERGE REAL + SANDBOX DATA ---
+  const effectiveEggTransactions = useMemo(() => [
+    ...sandboxEggTransactions,
+    ...eggTransactions
+  ], [sandboxEggTransactions, eggTransactions]);
+
+  const effectiveFeedTransactions = useMemo(() => [
+    ...sandboxFeedTransactions,
+    ...feedTransactions
+  ], [sandboxFeedTransactions, feedTransactions]);
+
+  const effectiveAfkirTransactions = useMemo(() => [
+    ...sandboxAfkirTransactions,
+    ...afkirTransactions
+  ], [sandboxAfkirTransactions, afkirTransactions]);
+
+  // --- RECALCULATE EFFECTIVE STOCK (SANDBOX) ---
+  const effectiveEggStock = useMemo(() => {
+    return effectiveEggTransactions.reduce((acc, curr) => {
+      const isArab = curr.keterangan?.includes('Jenis: Telur Ayam Arab');
+      const isHorn = !isArab;
+      const amount = Number(curr.jumlah_kg) || 0;
+      const type = (curr.jenis_transaksi || '').toLowerCase();
+      const isAdd = type.includes('terima') || type.includes('beli') || type.includes('setoran');
+      const isSub = type.includes('jual') || type.includes('keluar');
+
+      if (isAdd) {
+        if (isHorn) acc.horn += amount;
+        else if (isArab) acc.arab += amount;
+      } else if (isSub) {
+        if (isHorn) acc.horn -= amount;
+        else if (isArab) acc.arab -= amount;
+      }
+      return acc;
+    }, { horn: 0, arab: 0 });
+  }, [effectiveEggTransactions]);
+
+  const effectiveFeedItems = useMemo(() => {
+    return feedItems.map(item => ({
+      ...item,
+      stok_sekarang: (item.stok_sekarang || 0) + (sandboxFeedStockAdjustments[String(item.id)] || 0)
+    }));
+  }, [feedItems, sandboxFeedStockAdjustments]);
+
   const {
     summaryTelur,
     summaryPakan,
@@ -301,7 +351,13 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     financialData,
     dashboardStats,
     recentCombinedActivities
-  } = useFinancialEngine(eggTransactions, feedTransactions, afkirTransactions, eggStock, feedItems);
+  } = useFinancialEngine(
+    effectiveEggTransactions, 
+    effectiveFeedTransactions, 
+    effectiveAfkirTransactions, 
+    effectiveEggStock, 
+    effectiveFeedItems
+  );
 
   // Handlers
   const showToast = useCallback((message: string, type: 'success' | 'error' = 'success') => {
@@ -317,12 +373,26 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setIsSubmittingEggs(true);
     
     if (isSandbox) {
-      setTimeout(() => {
-        showToast('Berhasil mencatat transaksi (Mode Trial)', 'success');
-        setEggModalType(null);
-        setEggNotes('');
-        setIsSubmittingEggs(false);
-      }, 800);
+      const total_kg = eggIkat * 15;
+      const jenis = eggModalType === 'terima' ? 'Beli Telur' : 'Jual Telur';
+      const fakeId = `sandbox-${Date.now()}`;
+      const newTrx = {
+        id: fakeId,
+        tanggal: eggDate,
+        jenis_transaksi: jenis,
+        keterangan: `Mitra: ${mitraName} | Jenis: ${eggType}${eggNotes ? ` | Ket: ${eggNotes}` : ''}`,
+        jumlah_kg: total_kg,
+        harga_per_kg: eggPrice,
+        total_harga: total_kg * eggPrice,
+        jumlah_dibayar: 0,
+        created_at: new Date().toISOString()
+      };
+      
+      setSandboxEggTransactions(prev => [newTrx, ...prev]);
+      showToast('Berhasil mencatat transaksi (Mode Trial)', 'success');
+      setEggModalType(null);
+      setEggNotes('');
+      setIsSubmittingEggs(false);
       return;
     }
 
@@ -394,14 +464,46 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setIsSubmittingFeed(true);
 
     if (isSandbox) {
-      setTimeout(() => {
-        showToast('Berhasil mencatat pakan (Mode Trial)', 'success');
-        setFeedModalType(null);
-        setMitraName('');
-        setFeedNotes('');
-        setFeedCart([{ id_bahan: '', qty: 0, harga_per_satuan: 0 }]);
-        setIsSubmittingFeed(false);
-      }, 800);
+      const jenis = feedModalType === 'beli' ? 'Beli Pakan' : 'Jual Pakan';
+      const fakeId = `sandbox-${Date.now()}`;
+      
+      const newHeader = {
+        id: fakeId,
+        tanggal: feedDate,
+        jenis_transaksi: jenis,
+        nama_mitra: mitraName,
+        total_tagihan: feedCartTotal,
+        dibayar_hari_ini: 0,
+        keterangan: `Mitra: ${mitraName}${feedNotes ? ` | Ket: ${feedNotes}` : ''}`,
+        created_at: new Date().toISOString(),
+        details: feedCart.map((item, idx) => ({
+          id: `${fakeId}-det-${idx}`,
+          transaksi_pakan_id: fakeId,
+          bahan_id: item.id_bahan,
+          qty: item.qty,
+          harga_satuan: item.harga_per_satuan,
+          subtotal: item.qty * item.harga_per_satuan
+        }))
+      };
+
+      // Update Stock adjustment
+      const newAdjustments = { ...sandboxFeedStockAdjustments };
+      feedCart.forEach(item => {
+        const currentAdj = newAdjustments[String(item.id_bahan)] || 0;
+        newAdjustments[String(item.id_bahan)] = jenis === 'Beli Pakan' 
+          ? currentAdj + item.qty 
+          : currentAdj - item.qty;
+      });
+
+      setSandboxFeedTransactions(prev => [newHeader, ...prev]);
+      setSandboxFeedStockAdjustments(newAdjustments);
+      
+      showToast('Berhasil mencatat pakan (Mode Trial)', 'success');
+      setFeedModalType(null);
+      setMitraName('');
+      setFeedNotes('');
+      setFeedCart([{ id_bahan: '', qty: 0, harga_per_satuan: 0 }]);
+      setIsSubmittingFeed(false);
       return;
     }
 
@@ -509,15 +611,29 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setIsSubmittingAfkir(true);
 
     if (isSandbox) {
-      setTimeout(() => {
-        showToast('Berhasil mencatat afkir (Mode Trial)', 'success');
-        setIsAfkirModalOpen(false);
-        setAfkirNotes('');
-        setAfkirQty(0);
-        setAfkirPrice(0);
-        setAfkirMitra('');
-        setIsSubmittingAfkir(false);
-      }, 800);
+      const totalHarga = afkirQty * afkirPrice;
+      const fakeId = `sandbox-${Date.now()}`;
+      const newTrx = {
+        id: fakeId,
+        tanggal: afkirDate,
+        mitra_name: afkirMitra,
+        qty_ekor: afkirQty,
+        berat_total_kg: 0,
+        harga_per_satuan: afkirPrice,
+        total_harga: totalHarga,
+        keterangan: afkirNotes,
+        jumlah_dibayar: totalHarga,
+        created_at: new Date().toISOString()
+      };
+
+      setSandboxAfkirTransactions(prev => [newTrx, ...prev]);
+      showToast('Berhasil mencatat afkir (Mode Trial)', 'success');
+      setIsAfkirModalOpen(false);
+      setAfkirNotes('');
+      setAfkirQty(0);
+      setAfkirPrice(0);
+      setAfkirMitra('');
+      setIsSubmittingAfkir(false);
       return;
     }
 

@@ -134,7 +134,7 @@ export function BillingView() {
     <SectionContainer className="grid grid-cols-12 gap-6 pb-4">
       <style>{printStyles}</style>
       <div className="col-span-12 space-y-4">
-        <div className="flex items-center justify-between bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Tagihan & Piutang</h1>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kelola penagihan telur dan pakan mitra</p>
@@ -180,7 +180,7 @@ export function BillingView() {
         {billingMode === 'telur' ? (
           <div className="space-y-4">
             {/* Summary Strip (Telur) */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {(summaryTelur || []).map((card, i) => (
                 <div key={i} className="bg-white p-4 rounded-xl shadow-sm flex flex-col border border-slate-200/60">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{card.label}</p>
@@ -209,7 +209,7 @@ export function BillingView() {
                       <button onClick={() => setAgingFilter('all')} className="text-[9px] font-black text-black hover:text-slate-700 uppercase tracking-widest underline underline-offset-2">Reset Filter</button>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {([
                       { key: 'lancar' as const, label: '< 7 Hari', sub: 'Baru & lancar', color: 'green', items: cats.lancar },
                       { key: 'perhatian' as const, label: '7 – 30 Hari', sub: 'Perlu follow-up', color: 'amber', items: cats.perhatian },
@@ -250,7 +250,7 @@ export function BillingView() {
               <Card className="col-span-12 border-slate-200/60 shadow-sm overflow-hidden min-h-[600px]">
                 <CardHeader className="bg-slate-50/50 border-b border-slate-200 flex flex-col gap-4">
                   <CardTitle className="text-base font-black text-slate-900 uppercase tracking-tight">Invoice & Piutang Telur</CardTitle>
-                  <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl">
                       {['Semua', 'Belum Lunas', 'Lunas'].map((s: any) => (
                         <button 
@@ -296,7 +296,7 @@ export function BillingView() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
+                <CardContent className="p-0 overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-slate-50/30">
                       <TableRow className="border-slate-100">
@@ -549,7 +549,7 @@ export function BillingView() {
         ) : (
           <div className="space-y-4">
             {/* Summary Strip (Pakan) */}
-            <div className="grid grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {(summaryPakan || []).map((card, i) => (
                 <div key={i} className="bg-white p-4 rounded-xl shadow-sm flex flex-col border border-slate-200/60">
                   <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">{card.label}</p>
@@ -578,7 +578,7 @@ export function BillingView() {
                       <button onClick={() => setAgingFilter('all')} className="text-[9px] font-black text-black hover:text-slate-700 uppercase tracking-widest underline underline-offset-2">Reset Filter</button>
                     )}
                   </div>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {([
                       { key: 'lancar' as const, label: '< 7 Hari', sub: 'Baru & lancar', color: 'green', items: cats.lancar },
                       { key: 'perhatian' as const, label: '7 – 30 Hari', sub: 'Perlu follow-up', color: 'amber', items: cats.perhatian },
@@ -619,7 +619,7 @@ export function BillingView() {
               <Card className="col-span-12 border-slate-200/60 shadow-sm overflow-hidden min-h-[600px]">
                 <CardHeader className="bg-slate-50/50 border-b border-slate-200 flex flex-col gap-4">
                   <CardTitle className="text-base font-black text-slate-900 uppercase tracking-tight">Invoice & Piutang Pakan (PT MBF)</CardTitle>
-                  <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl">
                       {['Semua', 'Belum Lunas', 'Lunas'].map((s: any) => (
                         <button 
@@ -649,7 +649,7 @@ export function BillingView() {
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="p-0">
+                <CardContent className="p-0 overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-slate-50/30">
                       <TableRow className="border-slate-100">

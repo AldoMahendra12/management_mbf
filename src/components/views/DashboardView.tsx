@@ -487,6 +487,9 @@ export function DashboardView() {
           <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Aktivitas Terbaru</h3>
         </div>
 
+        <div className="overflow-x-auto min-w-full">
+          <div className="min-w-[800px]">
+
         {/* Table Header */}
         <div className="grid grid-cols-12 gap-4 px-6 py-3 bg-slate-50/50 border-b border-slate-100/40">
           <div className="col-span-2">
@@ -586,6 +589,8 @@ export function DashboardView() {
               description="Semua transaksi terbaru Anda akan muncul di sini." 
             />
           )}
+        </div>
+        </div>
         </div>
 
         {/* Pagination */}

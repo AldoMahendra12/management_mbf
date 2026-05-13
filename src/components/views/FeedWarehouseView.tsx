@@ -114,12 +114,12 @@ export function FeedWarehouseView() {
 
   return (
     <SectionContainer className="space-y-6">
-      <div className="flex items-center justify-between bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Gudang Pakan</h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Manajemen stok pakan, obat-obatan, dan suplemen</p>
         </div>
-        <div className="flex gap-3">
+        <div className="flex flex-wrap gap-3">
           <Button 
             disabled={userRole === 'viewer'}
             className="group relative overflow-hidden bg-orange-500 hover:bg-orange-600 text-white h-11 px-6 font-black text-xs uppercase tracking-widest rounded-xl active:bg-white active:text-slate-900 shadow-lg shadow-orange-500/20 transition-all duration-300" 
@@ -185,7 +185,7 @@ export function FeedWarehouseView() {
         </div>
       </div>
 
-      <div className="grid grid-cols-5 gap-4 relative">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 relative">
         {isLoading && (
           <div className="absolute inset-0 z-50 flex items-center justify-center bg-white/60 backdrop-blur-[2px] rounded-xl">
              <div className="flex flex-col items-center gap-3">
@@ -242,8 +242,8 @@ export function FeedWarehouseView() {
       </div>
 
       <div className="card-premium overflow-hidden border border-slate-200/60 shadow-sm flex flex-col">
-        <div className="bg-white px-10 py-8 border-b border-slate-100 flex flex-col gap-6">
-          <div className="flex items-center justify-between">
+        <div className="bg-white px-6 md:px-10 py-8 border-b border-slate-100 flex flex-col gap-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
                 <NotebookPen size={20} />
@@ -255,8 +255,8 @@ export function FeedWarehouseView() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className="relative flex-1 group">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="relative flex-1 w-full group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-slate-900 transition-colors" size={16} />
               <input 
                 type="text" 
@@ -324,6 +324,7 @@ export function FeedWarehouseView() {
           </div>
         </div>
 
+        <div className="overflow-x-auto">
         <Table>
           <TableHeader className="bg-slate-50/50">
             <TableRow className="border-slate-100 hover:bg-transparent">
@@ -435,6 +436,7 @@ export function FeedWarehouseView() {
             }
           </TableBody>
         </Table>
+        </div>
 
         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-50 bg-slate-50/30">
           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">

@@ -459,7 +459,7 @@ export function FinanceView() {
 
       {/* Section C — Mitra Recap Table */}
       <div className="bg-white border border-slate-200/60 rounded-xl shadow-sm overflow-hidden">
-        <div className="px-10 py-6 border-b border-slate-50 flex items-center justify-between bg-slate-50/30">
+        <div className="px-6 md:px-10 py-6 border-b border-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/30">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-orange-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20">
               <Users size={20} />
@@ -546,7 +546,7 @@ export function FinanceView() {
           </Table>
         </div>
         
-        <div className="px-10 py-4 bg-slate-50/30 border-t border-slate-50 flex justify-between items-center">
+        <div className="px-6 md:px-10 py-4 bg-slate-50/30 border-t border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
             Menampilkan {mitraRecap.length} pelanggan dalam periode ini
           </p>

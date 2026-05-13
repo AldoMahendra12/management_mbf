@@ -69,7 +69,7 @@ export const PaymentModal: React.FC = () => {
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-8 py-8 custom-scrollbar space-y-8">
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="p-6 bg-white rounded-2xl border border-slate-100 space-y-1 shadow-sm">
               <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Tagihan</p>
               <p className="text-xl font-black text-slate-900 tabular-nums">

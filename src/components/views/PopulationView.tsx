@@ -21,7 +21,7 @@ export function PopulationView() {
 
   return (
     <SectionContainer className="space-y-6">
-      <div className="flex items-center justify-between bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Manajemen Afkir Ayam</h1>
           <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
@@ -108,7 +108,8 @@ export function PopulationView() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <Table>
+            <div className="overflow-x-auto">
+        <Table>
               <TableHeader>
                 <TableRow className="border-b-2 border-slate-100 hover:bg-transparent">
                   <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 pl-6">Tanggal</TableHead>
@@ -152,6 +153,7 @@ export function PopulationView() {
                 )}
               </TableBody>
             </Table>
+        </div>
           </CardContent>
         </Card>
       </div>

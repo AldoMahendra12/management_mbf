@@ -196,9 +196,10 @@ export function ExportView() {
             </Badge>
           </div>
         </CardHeader>
-        <CardContent className="p-4 md:p-12 bg-slate-100/50 flex flex-col items-center overflow-x-auto w-full min-w-0">
-            {/* A4 Paper Preview */}
-            <div id="print-preview" ref={printRefLaporan} className="bg-white w-full min-w-[800px] md:min-w-0 md:max-w-[800px] min-h-[1100px] shadow-2xl shadow-slate-200 p-8 md:p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200">
+        <CardContent className="p-4 md:p-12 bg-slate-100/50 flex flex-col items-center w-full">
+            <div className="w-full flex justify-center overflow-hidden py-4 min-h-[300px] md:min-h-0">
+              <div className="origin-top transition-transform duration-500 scale-[0.4] sm:scale-[0.6] md:scale-100 mb-[-650px] sm:mb-[-400px] md:mb-0" style={{ width: '800px' }}>
+                <div id="print-preview" ref={printRefLaporan} className="bg-white w-[800px] min-h-[1100px] shadow-2xl shadow-slate-200 p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200">
               {/* Official Letterhead */}
               <div className="flex items-center justify-between border-b-[3px] border-slate-900 pb-8">
                   <div className="flex gap-6 items-center">
@@ -335,6 +336,8 @@ export function ExportView() {
               <div className="border-t-2 border-slate-100 pt-8 flex justify-between items-center opacity-50">
                   <p className="text-[9px] font-bold italic text-slate-400">Dokumen ini merupakan laporan resmi yang dihasilkan secara otomatis oleh Sistem Admin MBF.</p>
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Halaman 1 / 1</p>
+              </div>
+                </div>
               </div>
             </div>
 

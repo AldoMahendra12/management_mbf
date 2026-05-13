@@ -483,14 +483,18 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
     if (data.items && data.items.length > 0) {
       const newCart = data.items.map((item: any) => {
-        const matched = feedItems.find(f => 
-          f.nama_bahan.toLowerCase().includes(item.nama_bahan.toLowerCase()) ||
-          item.nama_bahan.toLowerCase().includes(f.nama_bahan.toLowerCase())
-        );
+        // ✅ Tambah fallback || '' agar tidak crash jika undefined
+        const ocrName = (item.name || item.nama_bahan || '').toLowerCase().trim();
+
+        const matched = feedItems.find(f => {
+          const dbName = (f.nama_bahan || '').toLowerCase().trim();
+          return dbName !== '' && (dbName.includes(ocrName) || ocrName.includes(dbName));
+        });
+
         return {
           id_bahan: matched ? String(matched.id) : '',
           qty: item.qty || 0,
-          harga_per_satuan: item.harga || 0
+          harga_per_satuan: item.price || item.harga || 0
         };
       });
       setFeedCart(newCart);

@@ -690,8 +690,12 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       async () => {
         try {
           if (isSandbox) {
-            setEggTransactions(prev => prev.filter(t => t.id !== id));
-            showToast('Penghapusan berhasil (Mode Trial)', 'success');
+            if (id.toString().startsWith('sandbox-')) {
+              setSandboxEggTransactions(prev => prev.filter(t => t.id !== id));
+              showToast('Penghapusan berhasil (Mode Trial)', 'success');
+            } else {
+              showToast('Anda tidak dapat menghapus data asli dalam mode Trial', 'error');
+            }
             return;
           }
 
@@ -749,8 +753,24 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       async () => {
         try {
           if (isSandbox) {
-            setFeedTransactions(prev => prev.filter(t => t.id !== id));
-            showToast('Penghapusan berhasil (Mode Trial)', 'success');
+            if (id.toString().startsWith('sandbox-')) {
+              const trxToDelete = sandboxFeedTransactions.find(t => t.id === id);
+              if (trxToDelete) {
+                // Reverse stock adjustments
+                const newAdjustments = { ...sandboxFeedStockAdjustments };
+                (trxToDelete.details || []).forEach((det: any) => {
+                  const currentAdj = newAdjustments[String(det.bahan_id)] || 0;
+                  newAdjustments[String(det.bahan_id)] = trxToDelete.jenis_transaksi === 'Beli Pakan'
+                    ? currentAdj - det.qty
+                    : currentAdj + det.qty;
+                });
+                setSandboxFeedStockAdjustments(newAdjustments);
+                setSandboxFeedTransactions(prev => prev.filter(t => t.id !== id));
+                showToast('Penghapusan berhasil (Mode Trial)', 'success');
+              }
+            } else {
+              showToast('Anda tidak dapat menghapus data asli dalam mode Trial', 'error');
+            }
             return;
           }
 

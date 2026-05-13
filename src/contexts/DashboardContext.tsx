@@ -739,7 +739,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     );
-  }, [supabase, fetchEggTransactions, fetchEggStock, showToast, showConfirm, isSandbox, userRole, setEggTransactions]);
+  }, [supabase, fetchEggTransactions, fetchEggStock, showToast, showConfirm, isSandbox, userRole, setEggTransactions, sandboxEggTransactions]);
 
   const handleDeleteFeedTransaction = useCallback(async (id: string) => {
     if (userRole === 'viewer') {
@@ -842,7 +842,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     );
-  }, [supabase, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, showConfirm, isSandbox, userRole, setFeedTransactions]);
+  }, [supabase, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, showConfirm, isSandbox, userRole, setFeedTransactions, sandboxFeedTransactions, sandboxFeedStockAdjustments]);
 
   const handleSubmitPayment = useCallback(async () => {
     if (paymentAmount <= 0) {

@@ -89,7 +89,7 @@ export function Sidebar({
     { id: 'Gudang Telur', icon: ShoppingCart, label: 'Gudang Telur' },
     { id: 'Gudang Pakan', icon: Package, label: 'Gudang Pakan' },
     { id: 'Afkir', icon: Bird, label: 'Afkir Ayam' },
-    { id: 'Tagihan', icon: DollarSign, label: 'Tagihan & Piutang' },
+    { id: 'Tagihan', icon: DollarSign, label: 'Tagihan' },
     { id: 'Keuangan', icon: FileBarChart, label: 'Laporan Keuangan' },
     { id: 'Ekspor', icon: FileText, label: 'Ekspor Data' },
   ];

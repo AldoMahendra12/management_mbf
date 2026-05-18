@@ -186,12 +186,39 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   // Egg State
   const [eggModalType, setEggModalType] = useState<'terima' | 'jual' | null>(null);
   const [eggDate, setEggDate] = useState(new Date().toISOString().split('T')[0]);
-  const [eggIkat, setEggIkat] = useState<number>(0);
-  const [eggPrice, setEggPrice] = useState<number>(0);
-  const [eggNotes, setEggNotes] = useState<string>('');
-  const [eggType, setEggType] = useState<string>('Telur Ayam Horn');
+  const [eggCart, setEggCart] = useState<any[]>([{ type: 'Telur Ayam Horn', grade: 'Krem', ikat: 0, qty: 0, price: 0, notes: '' }]);
   const [isSubmittingEggs, setIsSubmittingEggs] = useState(false);
-  const eggQty = useMemo(() => eggIkat * 15, [eggIkat]);
+  
+  const addEggCartRow = useCallback(() => {
+    setEggCart(prev => [...prev, { type: 'Telur Ayam Horn', grade: 'Krem', ikat: 0, qty: 0, price: 0, notes: '' }]);
+  }, []);
+
+  const removeEggCartRow = useCallback((index: number) => {
+    setEggCart(prev => prev.filter((_, i) => i !== index));
+  }, []);
+
+  const updateEggCartRow = useCallback((index: number, field: string, value: any) => {
+    setEggCart(prev => prev.map((row, i) => {
+      if (i !== index) return row;
+      const newRow = { ...row, [field]: value };
+      
+      if (field === 'type') {
+        if (value === 'Telur Ayam Horn') newRow.grade = 'Krem';
+        else newRow.grade = '';
+      }
+      
+      // Auto calc ikat -> qty for Horn
+      if ((field === 'ikat' || field === 'type') && newRow.type === 'Telur Ayam Horn') {
+        newRow.qty = newRow.ikat * 15;
+      }
+      
+      return newRow;
+    }));
+  }, []);
+
+  const eggCartTotal = useMemo(() => {
+    return eggCart.reduce((acc, curr) => acc + ((curr.qty || 0) * (curr.price || 0)), 0);
+  }, [eggCart]);
 
   // Feed State
   const [feedModalType, setFeedModalType] = useState<'beli' | 'jual' | null>(null);
@@ -275,6 +302,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [afkirPrice, setAfkirPrice] = useState<number>(0);
   const [afkirNotes, setAfkirNotes] = useState<string>('');
   const [afkirMitra, setAfkirMitra] = useState<string>('');
+  const [afkirKandang, setAfkirKandang] = useState<string>('');
   const [isSubmittingAfkir, setIsSubmittingAfkir] = useState(false);
 
   const {
@@ -366,52 +394,51 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const handleSubmitEgg = useCallback(async () => {
-    if (!mitraName || eggIkat <= 0) {
-      showToast('Mohon lengkapi data transaksi', 'error');
+    if (!mitraName || eggCart.some(i => i.qty <= 0)) {
+      showToast('Mohon lengkapi data transaksi telur', 'error');
       return;
     }
     setIsSubmittingEggs(true);
     
-    if (isSandbox) {
-      const total_kg = eggIkat * 15;
-      const jenis = eggModalType === 'terima' ? 'Beli Telur' : 'Jual Telur';
-      const fakeId = `sandbox-${Date.now()}`;
-      const newTrx = {
-        id: fakeId,
+    const jenis = eggModalType === 'terima' ? 'Beli Telur' : 'Jual Telur';
+
+    const insertData = eggCart.map(item => {
+      let itemName = item.type;
+      if (item.grade) itemName += ` - ${item.grade}`;
+      
+      const keterangan = `Mitra: ${mitraName} | Jenis: ${itemName}${item.notes ? ` | Ket: ${item.notes}` : ''}`;
+      const total_harga = item.qty * item.price;
+      
+      return {
         tanggal: eggDate,
         jenis_transaksi: jenis,
-        keterangan: `Mitra: ${mitraName} | Jenis: ${eggType}${eggNotes ? ` | Ket: ${eggNotes}` : ''}`,
-        jumlah_kg: total_kg,
-        harga_per_kg: eggPrice,
-        total_harga: total_kg * eggPrice,
-        jumlah_dibayar: 0,
-        created_at: new Date().toISOString()
+        keterangan,
+        jumlah_kg: item.qty, // Note: actually stores quantity (kg or biji depending on type)
+        harga_per_kg: item.price,
+        total_harga: total_harga,
+        jumlah_dibayar: 0
       };
-      
-      setSandboxEggTransactions(prev => [newTrx, ...prev]);
+    });
+
+    if (isSandbox) {
+      const sandboxRows = insertData.map((data, index) => ({
+        ...data,
+        id: `sandbox-${Date.now()}-${index}`,
+        created_at: new Date().toISOString()
+      }));
+      setSandboxEggTransactions(prev => [...sandboxRows, ...prev]);
       showToast('Berhasil mencatat transaksi (Mode Trial)', 'success');
       setEggModalType(null);
-      setEggNotes('');
+      setEggCart([{ type: 'Telur Ayam Horn', grade: 'Krem', ikat: 0, qty: 0, price: 0, notes: '' }]);
       setIsSubmittingEggs(false);
       return;
     }
 
-    const jenis = eggModalType === 'terima' ? 'Beli Telur' : 'Jual Telur';
-    const total_kg = eggIkat * 15;
-    
     try {
       if (supabase) {
         const { error } = await supabase
           .from('transaksi_telur')
-          .insert([{
-            tanggal: eggDate,
-            jenis_transaksi: jenis,
-            keterangan: `Mitra: ${mitraName} | Jenis: ${eggType}${eggNotes ? ` | Ket: ${eggNotes}` : ''}`,
-            jumlah_kg: total_kg,
-            harga_per_kg: eggPrice,
-            total_harga: total_kg * eggPrice,
-            jumlah_dibayar: 0
-          }]);
+          .insert(insertData);
           
         if (error) throw error;
         
@@ -419,7 +446,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         await fetchEggStock();
         showToast(`Berhasil mencatat ${eggModalType === 'terima' ? 'pembelian' : 'penjualan'} telur`);
         setEggModalType(null);
-        setEggNotes('');
+        setEggCart([{ type: 'Telur Ayam Horn', grade: 'Krem', ikat: 0, qty: 0, price: 0, notes: '' }]);
       }
     } catch (err: any) {
       console.error('Error submitting egg transaction:', err);
@@ -428,7 +455,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       setIsSubmittingEggs(false);
     }
   }, [
-    mitraName, eggIkat, eggModalType, eggPrice, eggDate, eggType, eggNotes,
+    mitraName, eggCart, eggModalType, eggDate,
     fetchEggTransactions, fetchEggStock, showToast, supabase, isSandbox
   ]);
 
@@ -610,6 +637,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
     setIsSubmittingAfkir(true);
 
+    const keteranganFinal = afkirKandang ? `Kandang Asal: ${afkirKandang}${afkirNotes ? ` | Ket: ${afkirNotes}` : ''}` : afkirNotes;
+
     if (isSandbox) {
       const totalHarga = afkirQty * afkirPrice;
       const fakeId = `sandbox-${Date.now()}`;
@@ -621,7 +650,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         berat_total_kg: 0,
         harga_per_satuan: afkirPrice,
         total_harga: totalHarga,
-        keterangan: afkirNotes,
+        keterangan: keteranganFinal,
         jumlah_dibayar: totalHarga,
         created_at: new Date().toISOString()
       };
@@ -630,6 +659,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       showToast('Berhasil mencatat afkir (Mode Trial)', 'success');
       setIsAfkirModalOpen(false);
       setAfkirNotes('');
+      setAfkirKandang('');
       setAfkirQty(0);
       setAfkirPrice(0);
       setAfkirMitra('');
@@ -649,7 +679,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
             berat_total_kg: 0,
             harga_per_satuan: afkirPrice,
             total_harga: totalHarga,
-            keterangan: afkirNotes,
+            keterangan: keteranganFinal,
             jumlah_dibayar: totalHarga
           }]);
 
@@ -658,6 +688,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         showToast('Berhasil mencatat penjualan ayam afkir');
         setIsAfkirModalOpen(false);
         setAfkirNotes('');
+        setAfkirKandang('');
         setAfkirQty(0);
         setAfkirPrice(0);
         setAfkirMitra('');
@@ -668,7 +699,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsSubmittingAfkir(false);
     }
-  }, [afkirQty, afkirMitra, afkirPrice, afkirDate, afkirNotes, supabase, fetchAfkirTransactions, showToast, setIsAfkirModalOpen, isSandbox]);
+  }, [afkirQty, afkirMitra, afkirPrice, afkirDate, afkirNotes, afkirKandang, supabase, fetchAfkirTransactions, showToast, setIsAfkirModalOpen, isSandbox]);
 
   const formatMoney = useCallback((amount: number, short: boolean = false) => {
     if (short && amount >= 1000000) {
@@ -844,6 +875,61 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     );
   }, [supabase, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, showConfirm, isSandbox, userRole, setFeedTransactions, sandboxFeedTransactions, sandboxFeedStockAdjustments]);
 
+  const handleDeleteAfkirTransaction = useCallback(async (id: string) => {
+    if (userRole === 'viewer') {
+      showToast('Anda tidak memiliki akses untuk menghapus data', 'error');
+      return;
+    }
+
+    showConfirm(
+      'Hapus Transaksi Afkir?',
+      'Transaksi afkir ini akan dihapus permanen.',
+      async () => {
+        try {
+          if (isSandbox) {
+            if (id.toString().startsWith('sandbox-')) {
+              setSandboxAfkirTransactions(prev => prev.filter(t => t.id !== id));
+              showToast('Penghapusan berhasil (Mode Trial)', 'success');
+            } else {
+              showToast('Anda tidak dapat menghapus data asli dalam mode Trial', 'error');
+            }
+            return;
+          }
+
+          if (!supabase) {
+            showToast('Koneksi database tidak tersedia', 'error');
+            return;
+          }
+
+          const { data: deleted, error } = await supabase
+            .from('transaksi_afkir')
+            .delete()
+            .eq('id', id)
+            .select();
+
+          if (error) {
+            console.error('Supabase DELETE error:', error);
+            showToast(`Gagal hapus: ${error.message}`, 'error');
+            return;
+          }
+
+          if (!deleted || deleted.length === 0) {
+            console.error('DELETE returned 0 rows — likely blocked by RLS policy');
+            showToast('Gagal hapus: akses ditolak oleh database (RLS). Hubungi admin.', 'error');
+            return;
+          }
+
+          await fetchAfkirTransactions();
+          showToast('Transaksi afkir berhasil dihapus');
+        } catch (err: any) {
+          console.error('Error deleting afkir trx:', err);
+          showToast(`Gagal menghapus: ${err?.message || 'Unknown error'}`, 'error');
+          await fetchAfkirTransactions();
+        }
+      }
+    );
+  }, [supabase, fetchAfkirTransactions, showToast, showConfirm, isSandbox, userRole, setSandboxAfkirTransactions]);
+
   const handleSubmitPayment = useCallback(async () => {
     if (paymentAmount <= 0) {
       showAlert('Nominal Tidak Valid', 'Nominal pembayaran harus lebih dari Rp 0.');
@@ -989,15 +1075,12 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     setEggModalType,
     eggDate,
     setEggDate,
-    eggIkat,
-    setEggIkat,
-    eggQty,
-    eggPrice,
-    setEggPrice,
-    eggNotes,
-    setEggNotes,
-    eggType,
-    setEggType,
+    eggCart,
+    setEggCart,
+    addEggCartRow,
+    removeEggCartRow,
+    updateEggCartRow,
+    eggCartTotal,
     feedNotes,
     setFeedNotes,
     isSubmittingEggs,
@@ -1057,6 +1140,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     fetchFeedTransactions,
     handleDeleteEggTransaction,
     handleDeleteFeedTransaction,
+    handleDeleteAfkirTransaction,
     handleSubmitPayment,
     isSubmittingPayment,
     setIsSubmittingPayment,

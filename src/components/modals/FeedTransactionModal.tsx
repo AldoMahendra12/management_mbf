@@ -32,7 +32,7 @@ export const FeedTransactionModal: React.FC = () => {
     handleOCRFeedResult
   } = useDashboard();
 
-  const [showConfirm, setShowConfirm] = React.useState(false);
+  const [step, setStep] = React.useState<1 | 2>(1);
 
   if (!feedModalType) return null;
 
@@ -44,7 +44,6 @@ export const FeedTransactionModal: React.FC = () => {
         exit={{ opacity: 0 }}
         onClick={() => {
           setFeedModalType(null);
-          setShowConfirm(false);
         }}
         className="absolute inset-0 bg-slate-900/40 backdrop-blur-md" 
       />
@@ -75,10 +74,10 @@ export const FeedTransactionModal: React.FC = () => {
             </div>
             <div>
               <p className="text-[10px] font-black text-white uppercase tracking-[0.4em] mb-1">
-                {showConfirm ? 'Konfirmasi Data' : 'Logistik Pakan'}
+                Logistik Pakan
               </p>
               <h3 className="text-2xl font-black text-slate-900 tracking-tighter">
-                {showConfirm ? 'Detail Pesanan' : (feedModalType === 'beli' ? 'Beli Stok Pakan' : 'Jual Pakan ke Customer')}
+                {feedModalType === 'beli' ? 'Beli Stok Pakan' : 'Jual Pakan ke Customer'}
               </h3>
             </div>
           </div>
@@ -87,7 +86,6 @@ export const FeedTransactionModal: React.FC = () => {
             size="icon" 
             onClick={() => {
               setFeedModalType(null);
-              setShowConfirm(false);
             }} 
             className="rounded-xl text-slate-400 hover:text-slate-900 hover:bg-white/50 transition-all w-10 h-10 border border-transparent hover:border-slate-100"
           >
@@ -96,62 +94,9 @@ export const FeedTransactionModal: React.FC = () => {
         </div>
 
         {/* Scrollable Body */}
-        <div className="flex-1 overflow-y-auto px-8 py-8 custom-scrollbar">
-          {showConfirm ? (
-            <motion.div 
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              className="space-y-6"
-            >
-              <div className="bg-white rounded-xl p-6 border border-slate-100 space-y-6 shadow-sm">
-                <div className="grid grid-cols-2 gap-8">
-                  <div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Tanggal Transaksi</p>
-                    <p className="text-sm font-black text-slate-900">{new Date(feedDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">{feedModalType === 'beli' ? 'Supplier' : 'Pembeli'}</p>
-                    <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{mitraName || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="pt-6 border-t border-slate-200/60">
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-4">Daftar Item</p>
-                   <div className="space-y-3">
-                      {feedCart.map((item, idx) => {
-                         const feedInfo = feedItems.find(f => String(f.id) === String(item.id_bahan));
-                         return (
-                            <div key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                               <div>
-                                  <p className="text-xs font-black text-slate-900 uppercase">{feedInfo?.nama_bahan || 'Unknown'}</p>
-                                  <p className="text-[10px] font-bold text-slate-400">{item.qty} {feedInfo?.satuan} @ Rp {item.harga_per_satuan?.toLocaleString('id-ID')}</p>
-                               </div>
-                               <p className="text-xs font-black text-slate-900">Rp {((item.qty || 0) * (item.harga_per_satuan || 0)).toLocaleString('id-ID')}</p>
-                            </div>
-                         );
-                      })}
-                   </div>
-                </div>
-
-                {feedNotes && (
-                   <div className="pt-6 border-t border-slate-200/60">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Catatan</p>
-                      <p className="text-[10px] font-bold text-slate-600 italic">"{feedNotes}"</p>
-                   </div>
-                )}
-              </div>
-
-              <div className="bg-orange-50/50 rounded-xl p-4 border border-orange-100 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-full bg-orange-100 flex items-center justify-center shrink-0 text-orange-600">
-                  <Package size={14} />
-                </div>
-                <p className="text-[10px] font-bold text-orange-800 leading-relaxed">
-                  Pastikan daftar item dan jumlah sudah sesuai. Klik <b>Konfirmasi & Simpan</b> untuk memproses transaksi ke dalam sistem.
-                </p>
-              </div>
-            </motion.div>
-          ) : (
-            <div className="space-y-8">
+        <div className="flex-1 overflow-y-auto px-8 py-8 custom-scrollbar space-y-8">
+          {step === 1 ? (
+            <>
               {/* AI OCR Section */}
               <OCRUpload 
                 type="feed" 
@@ -285,6 +230,59 @@ export const FeedTransactionModal: React.FC = () => {
                   className="w-full h-12 bg-white border border-slate-100 rounded-xl px-4 text-xs font-bold text-slate-900 outline-none focus:border-orange-200 transition-all placeholder:text-slate-300 shadow-sm" 
                 />
               </div>
+            </>
+          ) : (
+            <div className="space-y-6">
+              <div className="p-8 bg-orange-50/50 border border-orange-100 rounded-2xl space-y-6">
+                <div className="text-center pb-6 border-b border-orange-200/50">
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Konfirmasi Transaksi Pakan</h4>
+                  <p className="text-xs font-bold text-slate-500 mt-1">Pastikan data transaksi pakan sudah benar.</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-orange-100">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mitra / Customer</p>
+                    <p className="text-sm font-black text-slate-900 uppercase">{mitraName}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tanggal</p>
+                    <p className="text-sm font-black text-slate-900 uppercase">
+                      {new Date(feedDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-orange-100 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Daftar Item</p>
+                  </div>
+                  <div className="divide-y divide-slate-100">
+                    {feedCart.map((item, idx) => {
+                      const feedDef = feedItems.find(f => String(f.id) === String(item.id_bahan));
+                      const feedName = feedDef?.nama_bahan || 'Pakan';
+                      const satuan = feedDef?.satuan || 'Unit';
+                      return (
+                        <div key={idx} className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                          <div className="space-y-1">
+                            <span className="text-sm font-black text-slate-900 uppercase block">{feedName}</span>
+                            <span className="text-xs font-bold text-slate-500 block">
+                              {item.qty} {satuan} × Rp {(item.harga_per_satuan || 0).toLocaleString('id-ID')}
+                            </span>
+                          </div>
+                          <span className="text-sm font-black text-slate-900 tabular-nums">Rp {((item.qty || 0) * (item.harga_per_satuan || 0)).toLocaleString('id-ID')}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+
+                {feedNotes && (
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-orange-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Catatan</p>
+                    <p className="text-sm font-bold text-slate-700 italic">"{feedNotes}"</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -304,28 +302,22 @@ export const FeedTransactionModal: React.FC = () => {
           <div className="flex items-center gap-3 w-full sm:w-auto">
             <Button 
               variant="ghost" 
-              onClick={() => {
-                if (showConfirm) {
-                  setShowConfirm(false);
-                } else {
-                  setFeedModalType(null);
-                }
-              }} 
+              onClick={() => step === 2 ? setStep(1) : setFeedModalType(null)} 
               className="flex-1 sm:flex-none h-12 px-8 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-900 hover:bg-white transition-all"
             >
-              {showConfirm ? 'Kembali Edit' : 'Batal'}
+              {step === 2 ? 'Kembali' : 'Batal'}
             </Button>
             <Button 
               onClick={() => {
-                if (showConfirm) {
-                  handleSubmitFeed();
-                } else {
-                  // Basic validation
+                if (step === 1) {
                   if (!mitraName || feedCart.length === 0 || feedCartTotal === 0) {
                     showAlert('Data Tidak Lengkap', 'Mohon lengkapi data mitra dan item pakan sebelum menyimpan transaksi.');
                     return;
                   }
-                  setShowConfirm(true);
+                  setStep(2);
+                } else {
+                  handleSubmitFeed();
+                  setTimeout(() => setStep(1), 500); // reset step
                 }
               }}
               disabled={isSubmittingFeed}
@@ -341,8 +333,10 @@ export const FeedTransactionModal: React.FC = () => {
                   <div className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
                   <span>Processing...</span>
                 </div>
+              ) : step === 1 ? (
+                'Lanjut ke Konfirmasi'
               ) : (
-                showConfirm ? 'Konfirmasi & Simpan' : 'Simpan Transaksi'
+                'Simpan Transaksi'
               )}
             </Button>
           </div>

@@ -211,7 +211,7 @@ export function FinanceView() {
     const recapMap: Record<string, { name: string; income: number; expense: number; count: number }> = {};
 
     const process = (trx: any, amount: number, isIncome: boolean) => {
-      const name = (trx.nama_mitra || trx.keterangan?.replace('Mitra: ', '') || 'Pelanggan Umum').split('|')[0].trim();
+      const name = (trx.nama_mitra || trx.mitra_name || trx.keterangan?.replace('Mitra: ', '') || 'Pelanggan Umum').split('|')[0].trim();
       if (!recapMap[name]) {
         recapMap[name] = { name, income: 0, expense: 0, count: 0 };
       }

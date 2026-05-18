@@ -15,9 +15,12 @@ export const PopulationModal: React.FC = () => {
     afkirPrice, setAfkirPrice,
     afkirNotes, setAfkirNotes,
     afkirMitra, setAfkirMitra,
+    afkirKandang, setAfkirKandang,
     isSubmittingAfkir,
     handleSubmitAfkir,
   } = useDashboard();
+
+  const [step, setStep] = React.useState<1 | 2>(1);
 
   if (!isAfkirModalOpen) return null;
 
@@ -61,18 +64,35 @@ export const PopulationModal: React.FC = () => {
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-8 py-8 space-y-6 custom-scrollbar">
-          {/* Mitra / Pembeli */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-              <User size={12} /> Mitra / Nama Pembeli
-            </label>
-            <input 
-              type="text" 
-              value={afkirMitra}
-              onChange={(e) => setAfkirMitra(e.target.value)}
-              placeholder="Contoh: Pak Haji Ahmad" 
-              className="w-full h-12 bg-slate-50 border border-slate-100 rounded-xl px-4 text-sm font-black text-slate-900 outline-none focus:bg-white focus:border-orange-500 transition-all placeholder:text-slate-300" 
-            />
+          {step === 1 ? (
+            <>
+          <div className="grid grid-cols-2 gap-6">
+            {/* Mitra / Pembeli */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <User size={12} /> Mitra / Nama Pembeli
+              </label>
+              <input 
+                type="text" 
+                value={afkirMitra}
+                onChange={(e) => setAfkirMitra(e.target.value)}
+                placeholder="Contoh: Pak Haji Ahmad" 
+                className="w-full h-12 bg-slate-50 border border-slate-100 rounded-xl px-4 text-sm font-black text-slate-900 outline-none focus:bg-white focus:border-orange-500 transition-all placeholder:text-slate-300" 
+              />
+            </div>
+            {/* Kandang Asal */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                <Bird size={12} /> Kandang Asal
+              </label>
+              <input 
+                type="text" 
+                value={afkirKandang || ''}
+                onChange={(e) => setAfkirKandang(e.target.value)}
+                placeholder="Contoh: Kandang Pak Budi" 
+                className="w-full h-12 bg-slate-50 border border-slate-100 rounded-xl px-4 text-sm font-black text-slate-900 outline-none focus:bg-white focus:border-orange-500 transition-all placeholder:text-slate-300" 
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-6">
@@ -148,24 +168,85 @@ export const PopulationModal: React.FC = () => {
               className="w-full bg-slate-50 border border-slate-100 rounded-xl p-4 text-sm font-black text-slate-900 outline-none focus:bg-white focus:border-orange-500 transition-all placeholder:text-slate-300 resize-none"
             />
           </div>
+            </>
+          ) : (
+            <div className="space-y-6">
+              <div className="p-8 bg-orange-50/50 border border-orange-100 rounded-2xl space-y-6">
+                <div className="text-center pb-6 border-b border-orange-200/50">
+                  <h4 className="text-sm font-black text-slate-900 uppercase tracking-widest">Konfirmasi Penjualan Afkir</h4>
+                  <p className="text-xs font-bold text-slate-500 mt-1">Pastikan data transaksi penjualan ayam afkir sudah benar.</p>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-6 bg-white p-6 rounded-xl shadow-sm border border-orange-100">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Mitra / Pembeli</p>
+                    <p className="text-sm font-black text-slate-900 uppercase">{afkirMitra || '-'}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Kandang Asal</p>
+                    <p className="text-sm font-black text-slate-900 uppercase">{afkirKandang || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tanggal</p>
+                    <p className="text-sm font-black text-slate-900 uppercase">
+                      {new Date(afkirDate).toLocaleDateString('id-ID', { day: '2-digit', month: 'long', year: 'numeric' })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl shadow-sm border border-orange-100 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Detail Penjualan</p>
+                  </div>
+                  <div className="p-6 flex justify-between items-center hover:bg-slate-50 transition-colors">
+                    <div className="space-y-1">
+                      <span className="text-sm font-black text-slate-900 uppercase block">Ayam Afkir</span>
+                      <span className="text-xs font-bold text-slate-500 block">
+                        {afkirQty} EKOR × Rp {(afkirPrice || 0).toLocaleString('id-ID')}
+                      </span>
+                    </div>
+                    <span className="text-sm font-black text-slate-900 tabular-nums">Rp {((afkirQty || 0) * (afkirPrice || 0)).toLocaleString('id-ID')}</span>
+                  </div>
+                </div>
+
+                {afkirNotes && (
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-orange-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Catatan</p>
+                    <p className="text-sm font-bold text-slate-700 italic">"{afkirNotes}"</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 shrink-0">
           <Button 
             variant="ghost" 
-            onClick={() => setIsAfkirModalOpen(false)} 
+            onClick={() => step === 2 ? setStep(1) : setIsAfkirModalOpen(false)} 
             className="h-12 px-6 rounded-xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:text-slate-900"
           >
-            Batal
+            {step === 2 ? 'Kembali' : 'Batal'}
           </Button>
           <Button 
             disabled={userRole === 'viewer' || isSubmittingAfkir}
-            onClick={handleSubmitAfkir}
+            onClick={() => {
+              if (step === 1) {
+                // Ensure required fields are provided if any logic demands it, 
+                // but default values exist in state. Just move to step 2.
+                setStep(2);
+              } else {
+                handleSubmitAfkir();
+                setTimeout(() => setStep(1), 500); // reset step
+              }
+            }}
             className="h-12 px-10 rounded-xl bg-orange-600 text-white hover:bg-orange-700 font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-orange-500/20 transition-all flex items-center gap-3 active:scale-95"
           >
             {isSubmittingAfkir ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : step === 1 ? (
+              'Lanjut ke Konfirmasi'
             ) : (
               'Simpan & Masuk Keuangan'
             )}

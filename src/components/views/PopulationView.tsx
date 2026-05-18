@@ -1,5 +1,5 @@
 import React from 'react';
-import { Plus, TrendingUp, History, UserMinus, Scale } from 'lucide-react';
+import { Plus, TrendingUp, History, UserMinus, Scale, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,7 +13,8 @@ export function PopulationView() {
     userRole, 
     setIsAfkirModalOpen, 
     afkirTransactions, 
-    formatMoney 
+    formatMoney,
+    handleDeleteAfkirTransaction
   } = useDashboard();
 
   const totalEkor = afkirTransactions.reduce((acc, curr) => acc + (curr.qty_ekor || 0), 0);
@@ -117,12 +118,13 @@ export function PopulationView() {
                   <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 text-center">Jumlah (Qty)</TableHead>
                   <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 text-right">Harga Satuan</TableHead>
                   <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 text-right pr-6">Total Hasil</TableHead>
+                  <TableHead className="h-12 text-[10px] font-black uppercase text-slate-400 text-center pr-6 w-[80px]">Aksi</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {afkirTransactions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5}>
+                    <TableCell colSpan={6}>
                       <EmptyState 
                         icon={History} 
                         title="Belum ada data afkir" 
@@ -147,6 +149,16 @@ export function PopulationView() {
                       </TableCell>
                       <TableCell className="py-4 text-right pr-6 text-[12px] font-black text-emerald-600 tabular-nums">
                         {formatMoney(t.total_harga)}
+                      </TableCell>
+                      <TableCell className="py-4 text-center pr-6">
+                        <button
+                          onClick={() => handleDeleteAfkirTransaction(t.id)}
+                          disabled={userRole === 'viewer'}
+                          className="w-8 h-8 rounded-lg bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-500 border border-slate-200 hover:border-red-200 flex items-center justify-center transition-colors disabled:opacity-50 mx-auto"
+                          title="Hapus Transaksi"
+                        >
+                          <Trash2 size={14} />
+                        </button>
                       </TableCell>
                     </TableRow>
                   ))

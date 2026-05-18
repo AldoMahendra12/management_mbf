@@ -136,7 +136,7 @@ export function BillingView() {
       <div className="col-span-12 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
           <div className="flex flex-col gap-1">
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Tagihan & Piutang</h1>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Tagihan</h1>
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Kelola penagihan telur dan pakan mitra</p>
           </div>
           <div className="flex items-center gap-3">
@@ -222,7 +222,7 @@ export function BillingView() {
                           'rounded-xl p-4 text-left transition-all border-2',
                           agingFilter === chip.key
                             ? chip.color === 'green' ? 'bg-green-600 border-green-600 text-white shadow-lg shadow-green-500/20'
-                              : chip.color === 'amber' ? 'bg-amber-50 border-amber-500 text-white shadow-lg shadow-amber-500/20'
+                              : chip.color === 'amber' ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20'
                               : 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/20'
                             : chip.color === 'green' ? 'bg-green-50 border-green-100 hover:border-green-300'
                               : chip.color === 'amber' ? 'bg-amber-50 border-amber-100 hover:border-amber-300'
@@ -591,8 +591,8 @@ export function BillingView() {
                           'rounded-xl p-4 text-left transition-all border-2',
                           agingFilter === chip.key
                             ? chip.color === 'green' ? 'bg-green-600 border-green-600 text-white shadow-lg shadow-green-500/20'
-                              : chip.color === 'amber' ? 'bg-amber-50 border-amber-100 hover:border-amber-300'
-                              : 'bg-red-50 border-red-500 text-white shadow-lg shadow-red-500/20'
+                              : chip.color === 'amber' ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20'
+                              : 'bg-red-500 border-red-500 text-white shadow-lg shadow-red-500/20'
                             : chip.color === 'green' ? 'bg-green-50 border-green-100 hover:border-green-300'
                               : chip.color === 'amber' ? 'bg-amber-50 border-amber-100 hover:border-amber-300'
                               : 'bg-red-50 border-red-100 hover:border-red-300'

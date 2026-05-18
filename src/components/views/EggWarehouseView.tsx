@@ -52,8 +52,7 @@ export function EggWarehouseView() {
     setIsEggDetailOpen,
     setEggModalType,
     setMitraName,
-    setEggIkat,
-    setEggPrice,
+    setEggCart,
     eggStock,
     formatMoney,
     setActiveTab,
@@ -111,8 +110,7 @@ export function EggWarehouseView() {
                 className="group relative overflow-hidden bg-orange-500 hover:bg-orange-600 text-white h-11 px-6 font-black text-xs uppercase tracking-widest rounded-xl active:bg-white active:text-slate-900 shadow-lg shadow-orange-500/20 transition-all duration-300" 
                 onClick={() => {
                     setMitraName('');
-                    setEggIkat(0);
-                    setEggPrice(25000);
+                    if (setEggCart) setEggCart([{ type: 'Telur Ayam Horn', grade: 'Krem', ikat: 0, qty: 0, price: 25000, notes: '' }]);
                     setEggModalType('terima');
                 }}
             >
@@ -143,8 +141,7 @@ export function EggWarehouseView() {
                 className="group relative overflow-hidden bg-orange-500 hover:bg-orange-600 text-white h-11 px-6 font-black text-xs uppercase tracking-widest rounded-xl active:bg-white active:text-slate-900 shadow-lg shadow-orange-500/20 transition-all duration-300" 
                 onClick={() => {
                     setMitraName('');
-                    setEggIkat(0);
-                    setEggPrice(27500);
+                    if (setEggCart) setEggCart([{ type: 'Telur Ayam Horn', grade: 'Krem', ikat: 0, qty: 0, price: 27500, notes: '' }]);
                     setEggModalType('jual');
                 }}
             >
@@ -177,7 +174,7 @@ export function EggWarehouseView() {
         {[
           { label: 'Total Beli Telur', val: `${totalMasukEgg.toLocaleString('id-ID')} kg`, sub: 'Total telur diterima dari kandang' },
           { label: 'Total Jual Telur', val: `${totalKeluarEgg.toLocaleString('id-ID')} kg`, sub: 'Total telur terjual ke mitra' },
-          { label: 'Stok Gudang Telur', val: `${((eggStock?.horn || 0) + (eggStock?.arab || 0)).toLocaleString('id-ID')} kg`, sub: 'Sisa stok telur di gudang' },
+          { label: 'Stok Gudang Telur', val: `${((eggStock?.horn || 0) + (eggStock?.arab || 0) + (eggStock?.puyuh || 0)).toLocaleString('id-ID')} kg`, sub: 'Sisa stok telur di gudang' },
         ].map((card, i) => (
           <div key={i} className="card-premium p-4 md:p-6 flex flex-col justify-between h-auto md:h-[140px] min-w-0">
              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.label}</p>

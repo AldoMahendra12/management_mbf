@@ -14,7 +14,8 @@ import {
   Clock,
   ArrowUpRight,
   Bell,
-  Calendar
+  Calendar,
+  Bird
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SectionContainer } from '../layout/SectionContainer';

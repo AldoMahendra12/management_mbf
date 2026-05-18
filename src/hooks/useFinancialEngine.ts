@@ -33,7 +33,7 @@ export const useFinancialEngine = (
 
   const feedRecv = useMemo(() => feedTransactions.filter((trx: any) => {
     const t = (trx.jenis_transaksi || '').toLowerCase();
-    return t.includes('jual') || t.includes('keluar') || t.includes('pakan');
+    return t.includes('jual') || t.includes('keluar');
   }), [feedTransactions]);
   const totalRecvPakan = useMemo(() => feedRecv.reduce((acc: number, t: any) => acc + (Number(t.total_tagihan) || 0), 0), [feedRecv]);
   const totalPaidPakan = useMemo(() => feedRecv.reduce((acc: number, t: any) => acc + (Number(t.dibayar_hari_ini) || 0), 0), [feedRecv]);

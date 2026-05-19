@@ -191,47 +191,63 @@ export const EggTransactionModal: React.FC = () => {
                         </div>
                       ) : <div />}
 
-                        {/* Input Jumlah/Ikat */}
-                        {!isArab && !isPuyuh ? (
-                          <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between">
-                              <span>Jumlah Ikat</span>
-                            </label>
+                        <div className="space-y-2">
+                          {/* Mode toggle */}
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center justify-between h-8">
+                            <span>Jumlah</span>
+                            <div className="flex items-center bg-slate-100 rounded-lg p-0.5 gap-0.5">
+                              {(['ikat', isArab ? 'butir' : 'kg'] as const).map((mode) => (
+                                <button
+                                  key={mode}
+                                  type="button"
+                                  onClick={() => updateEggCartRow(index, 'inputMode', mode)}
+                                  className={cn(
+                                    'px-2.5 py-1 text-[9px] font-black uppercase tracking-widest rounded-md transition-all',
+                                    (item.inputMode ?? 'ikat') === mode
+                                      ? 'bg-white text-slate-900 shadow-sm'
+                                      : 'text-slate-400 hover:text-slate-600'
+                                  )}
+                                >
+                                  {mode}
+                                </button>
+                              ))}
+                            </div>
+                          </label>
+
+                          {/* Ikat input (default) */}
+                          {(item.inputMode ?? 'ikat') === 'ikat' ? (
                             <div className="relative">
-                              <input 
-                                type="number" 
+                              <input
+                                type="number"
                                 value={item.ikat || ''}
                                 onChange={(e) => updateEggCartRow(index, 'ikat', Number(e.target.value))}
                                 placeholder="0"
-                                className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-black text-slate-900 outline-none focus:border-orange-200 transition-all pr-12" 
+                                className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-black text-slate-900 outline-none focus:border-orange-200 transition-all pr-12"
                               />
                               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 uppercase">Ikat</span>
                             </div>
-                            <p className="text-[9px] font-bold text-slate-400 px-1 mt-1">= {item.qty || 0} Kg</p>
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">
-                              Jumlah ({isArab ? 'Butir' : 'Kg'})
-                            </label>
+                          ) : (
                             <div className="relative">
-                              <input 
-                                type="number" 
+                              <input
+                                type="number"
                                 value={item.qty || ''}
                                 onChange={(e) => updateEggCartRow(index, 'qty', Number(e.target.value))}
                                 placeholder="0"
-                                className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-black text-slate-900 outline-none focus:border-orange-200 transition-all pr-12" 
+                                className="w-full h-11 bg-white border border-slate-200 rounded-xl px-4 text-xs font-black text-slate-900 outline-none focus:border-orange-200 transition-all pr-12"
                               />
-                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 uppercase">
-                                {isArab ? 'BTR' : 'KG'}
-                              </span>
+                              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black text-slate-300 uppercase">{isArab ? 'BTR' : 'KG'}</span>
                             </div>
-                          </div>
-                        )}
+                          )}
+
+                          {/* Conversion hint */}
+                          {(item.inputMode ?? 'ikat') === 'ikat' && (
+                            <p className="text-[9px] font-bold text-slate-400 px-1 mt-1">= {item.qty || 0} {isArab ? 'Butir' : 'Kg'}</p>
+                          )}
+                        </div>
 
                         {/* Harga Satuan */}
                         <div className="space-y-2">
-                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5">
+                          <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1.5 h-8">
                             <Tag size={10} /> Harga per {isArab ? 'Butir' : 'Kg'}
                           </label>
                           <div className="relative">
@@ -305,7 +321,10 @@ export const EggTransactionModal: React.FC = () => {
                           <div className="space-y-1">
                             <span className="text-sm font-black text-slate-900 uppercase block">{item.type} {item.grade ? `- ${item.grade}` : ''}</span>
                             <span className="text-xs font-bold text-slate-500 block">
-                              {item.qty} {isArab ? 'BTR' : 'KG'} × Rp {(item.price || 0).toLocaleString('id-ID')}
+                              {(item.inputMode ?? 'ikat') === 'ikat' && !isArab && !item.type.includes('Puyuh') 
+                                ? `${item.ikat} IKAT (${item.qty} KG)` 
+                                : `${item.qty} ${isArab ? 'BTR' : 'KG'}`
+                              } × Rp {(item.price || 0).toLocaleString('id-ID')}
                             </span>
                             {item.notes && <span className="text-[10px] font-bold text-slate-400 block italic">"{item.notes}"</span>}
                           </div>

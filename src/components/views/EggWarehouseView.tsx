@@ -70,6 +70,8 @@ export function EggWarehouseView() {
 
   const filteredTransactions = eggTransactions.filter(row => {
     const rawJenis = row.jenis_transaksi?.toLowerCase() || '';
+    if (rawJenis === 'stok awal') return false; // Sembunyikan transaksi stok awal dari tabel UI
+    
     const normalizedJenis = (rawJenis === 'terima setoran' || rawJenis === 'beli telur') ? 'Beli Telur' : 
                             (rawJenis === 'jual ke luar' || rawJenis === 'jual telur') ? 'Jual Telur' : row.jenis_transaksi;
     
@@ -172,14 +174,18 @@ export function EggWarehouseView() {
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
         {[
-          { label: 'Total Beli Telur', val: `${totalMasukEgg.toLocaleString('id-ID')} kg`, sub: 'Total telur diterima dari kandang' },
-          { label: 'Total Jual Telur', val: `${totalKeluarEgg.toLocaleString('id-ID')} kg`, sub: 'Total telur terjual ke mitra' },
-          { label: 'Stok Gudang Telur', val: `${((eggStock?.horn || 0) + (eggStock?.arab || 0) + (eggStock?.puyuh || 0)).toLocaleString('id-ID')} kg`, sub: 'Sisa stok telur di gudang' },
+          { label: 'Total Beli Telur', val: <>{totalMasukEgg.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></>, sub: 'Total telur diterima dari kandang' },
+          { label: 'Total Jual Telur', val: <>{totalKeluarEgg.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></>, sub: 'Total telur terjual ke mitra' },
+          { label: 'Stok Gudang Telur', val: <>
+            <span>{((eggStock?.horn || 0) + (eggStock?.arab || 0) + (eggStock?.puyuh || 0)).toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></span>
+            <span className="text-slate-300 font-light mx-1">/</span>
+            <span>{(Math.floor((eggStock?.horn || 0) / 15) + Math.floor((eggStock?.arab || 0) / 300) + Math.floor((eggStock?.puyuh || 0) / 10)).toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
+          </>, sub: 'Sisa stok telur di gudang' },
         ].map((card, i) => (
           <div key={i} className="card-premium p-4 md:p-6 flex flex-col justify-between h-auto md:h-[140px] min-w-0">
              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.label}</p>
              <div>
-               <h3 className="text-2xl font-black text-slate-900 tracking-tighter tabular-nums">{card.val}</h3>
+               <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tighter tabular-nums flex items-baseline flex-wrap gap-x-1">{card.val}</h3>
                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">{card.sub}</p>
              </div>
           </div>
@@ -276,7 +282,7 @@ export function EggWarehouseView() {
               <TableHead className="pl-10 h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu / Invoice</TableHead>
               <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Jenis</TableHead>
               <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</TableHead>
-              <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Kuantitas (kg)</TableHead>
+              <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item</TableHead>
               <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Nominal</TableHead>
               <TableHead className="pr-10 h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aksi</TableHead>
             </TableRow>
@@ -303,6 +309,33 @@ export function EggWarehouseView() {
                                    row.jenis_transaksi;
               const isBeli = displayJenis === 'Beli Telur';
 
+              const isGrouped = row.keterangan?.includes('| JSON:');
+              let displayItem = '';
+              let otherCount = 0;
+              let mitraNameDisplay = 'Umum';
+
+              if (row.keterangan) {
+                const parts = row.keterangan.split('|');
+                mitraNameDisplay = parts[0].replace('Mitra:', '').trim() || 'Umum';
+              }
+
+              if (isGrouped) {
+                try {
+                  const jsonPart = row.keterangan?.split('| JSON:')[1];
+                  const items = JSON.parse(jsonPart || '[]');
+                  if (items.length > 0) {
+                    const firstItem = items[0];
+                    const unit = (firstItem.type === 'Telur Ayam Arab' || firstItem.type === 'Telur Puyuh') ? 'btr' : 'kg';
+                    displayItem = `${firstItem.type}${firstItem.grade ? ` - ${firstItem.grade}` : ''} ${firstItem.qty} ${unit}`;
+                    otherCount = items.length - 1;
+                  }
+                } catch (e) {
+                  displayItem = 'Telur';
+                }
+              } else {
+                displayItem = `${(row.keterangan || '').split('Jenis: ')[1]?.split('|')[0]?.trim() || 'Telur'} ${(row.jumlah_kg || 0).toLocaleString('id-ID')} ${(row.keterangan || '').toLowerCase().includes('arab') ? 'btr' : 'kg'}`;
+              }
+
               return (
                 <TableRow key={row.id || i} className="group hover:bg-slate-50 transition-colors border-slate-50">
                   <TableCell className="pl-10 py-5">
@@ -323,12 +356,21 @@ export function EggWarehouseView() {
                 <TableCell>
                   <div className="flex flex-col">
                     <span className="text-xs font-black text-slate-900 uppercase tracking-tight">
-                        {(row.keterangan?.split('|')[0]?.replace('Mitra: ', '') || 'Umum').trim()}
+                        {mitraNameDisplay}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell className="text-left">
-                  <span className="text-xs font-black text-slate-900 tabular-nums">{(row.jumlah_kg || 0).toLocaleString('id-ID')} kg</span>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black text-slate-900">
+                      {displayItem}
+                    </span>
+                    {otherCount > 0 && (
+                      <span className="text-[9px] font-bold text-slate-400 mt-0.5">
+                        dan {otherCount} item lainnya
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                   <TableCell className="text-left">
                     <span className="text-xs font-black tabular-nums text-slate-900">

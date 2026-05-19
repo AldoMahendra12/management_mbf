@@ -86,21 +86,55 @@ export const EggDetailModal: React.FC = () => {
                   {selectedEggDetail.nama_mitra || selectedEggDetail.keterangan?.replace('Mitra: ', '')?.split('|')[0]?.trim() || '-'}
                 </span>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Jenis Telur</span>
-                <span className="text-xs font-black text-slate-900 uppercase">
-                  {(() => {
-                    const ket = selectedEggDetail.keterangan || "";
+            </div>
+
+            <div className="mt-4 pt-4 border-t border-slate-100">
+              <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-3 block">Rincian Item</span>
+              <div className="space-y-3">
+                {(() => {
+                  const ket = selectedEggDetail.keterangan || "";
+                  const isGrouped = ket.includes('| JSON:');
+                  if (isGrouped) {
+                    try {
+                      const jsonPart = ket.split('| JSON:')[1];
+                      const items = JSON.parse(jsonPart);
+                      return items.map((item: any, idx: number) => {
+                        const unit = (item.type === 'Telur Ayam Arab' || item.type === 'Telur Puyuh') ? 'btr' : 'kg';
+                        return (
+                          <div key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100/50">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">
+                                {item.type}{item.grade ? ` - ${item.grade}` : ''}
+                              </span>
+                              {item.notes && <span className="text-[9px] font-medium text-slate-400">{item.notes}</span>}
+                            </div>
+                            <div className="text-right">
+                              <span className="text-xs font-black text-slate-900 uppercase">{item.qty} {unit}</span>
+                              <p className="text-[9px] font-bold text-slate-400">@ {formatMoney(item.price)}</p>
+                            </div>
+                          </div>
+                        );
+                      });
+                    } catch (e) {
+                      return null;
+                    }
+                  } else {
                     const typeMatch = ket.match(/Jenis: ([^|]+)/);
-                    return typeMatch ? typeMatch[1].trim() : "Telur Ayam Ras";
-                  })()}
-                </span>
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Berat</span>
-                <span className="text-xs font-black text-slate-900 uppercase">
-                  {(selectedEggDetail.jumlah_kg || 0).toLocaleString('id-ID')} KG
-                </span>
+                    const typeName = typeMatch ? typeMatch[1].trim() : "Telur Ayam Ras";
+                    const unit = ket.toLowerCase().includes('arab') ? 'btr' : 'kg';
+                    return (
+                      <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100/50">
+                        <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">
+                          {typeName}
+                        </span>
+                        <div className="text-right">
+                          <span className="text-xs font-black text-slate-900 uppercase">{(selectedEggDetail.jumlah_kg || 0).toLocaleString('id-ID')} {unit}</span>
+                          <p className="text-[9px] font-bold text-slate-400">@ {formatMoney(selectedEggDetail.harga_per_kg || 0)}</p>
+                        </div>
+                      </div>
+                    );
+                  }
+                })()}
               </div>
             </div>
           </div>

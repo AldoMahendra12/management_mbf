@@ -323,8 +323,10 @@ export function DashboardView() {
         <div className="bg-white border border-slate-200/50 rounded-xl flex flex-col justify-between group cursor-pointer hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 shadow-sm transition-all duration-500 overflow-hidden" onClick={() => setActiveTab('Gudang Telur')}>
           <div className="p-4 md:p-6 pb-4 md:pb-5">
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Telur</p>
-            <h3 className="font-black text-slate-900 mt-3 tracking-tighter tabular-nums text-2xl">
-              {dashboardStats.stokTelur.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span>
+            <h3 className="font-black text-slate-900 mt-3 tracking-tighter tabular-nums text-lg xl:text-xl flex items-baseline flex-wrap gap-x-1">
+              <span>{dashboardStats.stokTelur.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></span>
+              <span className="text-slate-300 font-light mx-0.5">/</span>
+              <span>{dashboardStats.stokTelurIkat?.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
             </h3>
             <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Tersedia di gudang</p>
           </div>

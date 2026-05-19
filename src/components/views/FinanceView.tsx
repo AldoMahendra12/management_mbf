@@ -90,6 +90,7 @@ export function FinanceView() {
   const [rangeMode, setRangeMode] = useState<DateRangeMode>('bulan');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
+  const [selectedEntity, setSelectedEntity] = useState<'MBF' | 'BEF'>('MBF');
   const [detailModal, setDetailModal] = useState<'masuk' | 'keluar' | 'net' | null>(null);
   const [mitraSearch, setMitraSearch] = useState('');
 
@@ -100,22 +101,22 @@ export function FinanceView() {
 
   // Filter transactions within date range
   const filteredEgg = useMemo(() =>
-    eggTransactions.filter(t => {
+    selectedEntity === 'BEF' ? eggTransactions.filter(t => {
       const d = new Date(t.tanggal || t.created_at);
       return d >= start && d <= end;
-    }), [eggTransactions, start, end]);
+    }) : [], [eggTransactions, start, end, selectedEntity]);
 
   const filteredFeed = useMemo(() =>
-    feedTransactions.filter(t => {
+    selectedEntity === 'MBF' ? feedTransactions.filter(t => {
       const d = new Date(t.tanggal || t.created_at);
       return d >= start && d <= end;
-    }), [feedTransactions, start, end]);
+    }) : [], [feedTransactions, start, end, selectedEntity]);
 
   const filteredAfkir = useMemo(() =>
-    afkirTransactions.filter(t => {
+    selectedEntity === 'BEF' ? afkirTransactions.filter(t => {
       const d = new Date(t.tanggal || t.created_at);
       return d >= start && d <= end;
-    }), [afkirTransactions, start, end]);
+    }) : [], [afkirTransactions, start, end, selectedEntity]);
 
   // Section A: Summary cards breakdown
   const { eggIn, feedIn, eggOut, feedOut, afkirIn } = useMemo(() => {
@@ -162,8 +163,14 @@ export function FinanceView() {
     const addDays = (start: Date, end: Date) => {
       const days: string[] = [];
       const cur = new Date(start);
-      while (cur <= end) {
-        days.push(cur.toISOString().split('T')[0]);
+      cur.setHours(0, 0, 0, 0);
+      const endReset = new Date(end);
+      endReset.setHours(23, 59, 59, 999);
+      while (cur <= endReset) {
+        const year = cur.getFullYear();
+        const month = String(cur.getMonth() + 1).padStart(2, '0');
+        const day = String(cur.getDate()).padStart(2, '0');
+        days.push(`${year}-${month}-${day}`);
         cur.setDate(cur.getDate() + 1);
       }
       return days;
@@ -257,11 +264,34 @@ export function FinanceView() {
     <SectionContainer className="space-y-6">
       {/* Header with Date Range Picker */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Laporan Keuangan</h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            Tren arus kas dan rekap operasional
-          </p>
+        <div className="flex flex-col gap-3">
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Laporan Keuangan</h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              Tren arus kas dan rekap operasional
+            </p>
+          </div>
+          
+          <div className="flex p-1 bg-slate-100/50 rounded-xl border border-slate-200/50 w-max">
+            <button
+              onClick={() => setSelectedEntity('MBF')}
+              className={cn(
+                'px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2',
+                selectedEntity === 'MBF' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              PT MBF (Pakan)
+            </button>
+            <button
+              onClick={() => setSelectedEntity('BEF')}
+              className={cn(
+                'px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2',
+                selectedEntity === 'BEF' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              CV BEF (Telur)
+            </button>
+          </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">

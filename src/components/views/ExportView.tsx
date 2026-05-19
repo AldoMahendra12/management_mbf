@@ -36,6 +36,11 @@ export function ExportView() {
   const filteredEgg = eggTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
   const filteredFeed = feedTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
   const filteredAfkir = afkirTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
+
+  const printEgg = selectedEntity === 'BEF' ? filteredEgg : [];
+  const printFeed = selectedEntity === 'MBF' ? filteredFeed : [];
+  const printAfkir = selectedEntity === 'BEF' ? filteredAfkir : [];
+
   const printRefLaporan = useRef<HTMLDivElement>(null);
   const handlePrintLaporan = useReactToPrint({ contentRef: printRefLaporan });
 
@@ -251,19 +256,19 @@ export function ExportView() {
               <div className="grid grid-cols-3 gap-6">
                 {[
                     { label: 'Total Pemasukan', val: formatMoney(
-                      filteredEgg.reduce((s, t) => s + (t.total_harga || 0), 0) + 
-                      filteredFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) +
-                      filteredAfkir.reduce((s, t) => s + (t.total_harga || 0), 0)
+                      printEgg.reduce((s, t) => s + (t.total_harga || 0), 0) + 
+                      printFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) +
+                      printAfkir.reduce((s, t) => s + (t.total_harga || 0), 0)
                       , false) 
                     },
                     { label: 'Total Pengeluaran', val: formatMoney(
-                      filteredFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + 
-                      filteredEgg.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0)
+                      printFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + 
+                      printEgg.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0)
                       , false) 
                     },
                     { label: 'Selisih Bersih', val: formatMoney(
-                      (filteredEgg.reduce((s, t) => s + (t.total_harga || 0), 0) + filteredFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + filteredAfkir.reduce((s, t) => s + (t.total_harga || 0), 0)) - 
-                      (filteredFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + filteredEgg.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0))
+                      (printEgg.reduce((s, t) => s + (t.total_harga || 0), 0) + printFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + printAfkir.reduce((s, t) => s + (t.total_harga || 0), 0)) - 
+                      (printFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + printEgg.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0))
                       , false) 
                     },
                 ].map((s, i) => (
@@ -287,7 +292,7 @@ export function ExportView() {
                     </TableHeader>
                     <TableBody>
                         {(() => {
-                          const combined = [...filteredEgg, ...filteredFeed, ...filteredAfkir];
+                          const combined = [...printEgg, ...printFeed, ...printAfkir];
                           if (combined.length === 0) {
                             return (
                               <TableRow>

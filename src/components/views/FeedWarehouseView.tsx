@@ -201,6 +201,7 @@ export function FeedWarehouseView() {
           const statusText = isKritis ? 'Kritis' : isMenipis ? 'Menipis' : 'Aman';
           const statusColor = isKritis ? 'bg-red-500' : isMenipis ? 'bg-amber-500' : 'bg-green-500';
           const percent = Math.min(100, (card.stok_sekarang / ((card.batas_minimum || 50) * 5)) * 100);
+          const displaySatuan = (card.nama_bahan?.toUpperCase() === 'MIX SAMS' || card.nama_bahan?.toUpperCase() === 'SAMS QUIN') ? 'kg' : card.satuan;
 
           return (
             <div key={i} className={cn(
@@ -213,7 +214,7 @@ export function FeedWarehouseView() {
                 <Package size={14} className={cn("text-slate-300", isMenipis && !isKritis ? "text-amber-500" : isKritis ? "text-red-500" : "text-green-500")} />
               </div>
               <div className="mt-2 md:mt-4 mb-2">
-                <h4 className="text-xl md:text-2xl font-black text-slate-900 leading-none">{card.stok_sekarang} <span className="text-[10px] font-bold text-slate-400 ml-1">{card.satuan}</span></h4>
+                <h4 className="text-xl md:text-2xl font-black text-slate-900 leading-none">{card.stok_sekarang.toLocaleString('id-ID')} <span className="text-[10px] font-bold text-slate-400 ml-1">{displaySatuan}</span></h4>
               </div>
               <div className="space-y-3">
                 <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
@@ -225,7 +226,7 @@ export function FeedWarehouseView() {
                   />
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[9px] font-bold text-slate-400">Min: {card.batas_minimum || 0} {card.satuan}</span>
+                  <span className="text-[9px] font-bold text-slate-400">Min: {(card.batas_minimum || 0).toLocaleString('id-ID')} {displaySatuan}</span>
                   <Badge className={cn(
                     "text-[8px] font-black uppercase px-2 py-0.5 rounded-lg border-none shadow-none",
                     statusText === 'Aman' ? "bg-green-100 text-green-600" :
@@ -331,7 +332,7 @@ export function FeedWarehouseView() {
               <TableHead className="pl-10 h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu / Nota</TableHead>
               <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Jenis</TableHead>
               <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Pelanggan</TableHead>
-              <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Item</TableHead>
+              <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item</TableHead>
               <TableHead className="h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tagihan</TableHead>
               <TableHead className="pr-10 h-12 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Aksi</TableHead>
             </TableRow>
@@ -358,6 +359,15 @@ export function FeedWarehouseView() {
                                    row.jenis_transaksi;
               const isBeli = displayJenis === 'Beli Pakan';
 
+              // Build descriptive item summary
+              const details = row.details || [];
+              const firstDetail = details[0];
+              const firstBahan = firstDetail ? feedItems.find((f: any) => String(f.id) === String(firstDetail.bahan_id)) : null;
+              const firstName = firstBahan?.nama_bahan || row.nama_bahan_utama || 'Pakan';
+              const firstQty = firstDetail?.qty || 0;
+              const firstSatuan = firstBahan?.satuan || firstDetail?.satuan || row.satuan_utama || 'unit';
+              const otherCount = details.length > 1 ? details.length - 1 : 0;
+
               return (
                 <TableRow key={row.id || i} className="group hover:bg-slate-50 transition-colors border-slate-50">
                   <TableCell className="pl-10 py-5">
@@ -381,9 +391,16 @@ export function FeedWarehouseView() {
                     </div>
                   </TableCell>
                   <TableCell className="text-left">
-                    <span className="text-xs font-black text-slate-900 tabular-nums">
-                      {(row.details || []).reduce((acc: number, d: any) => acc + (d.qty || 0), 0)} {(row.details?.[0] as any)?.satuan || row.satuan_utama}
-                    </span>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-black text-slate-900">
+                        {firstName} {firstQty} {firstSatuan}
+                      </span>
+                      {otherCount > 0 && (
+                        <span className="text-[9px] font-bold text-slate-400">
+                          dan {otherCount} item lainnya
+                        </span>
+                      )}
+                    </div>
                   </TableCell>
                   <TableCell className="text-left">
                     <span className="text-xs font-black tabular-nums text-slate-900">

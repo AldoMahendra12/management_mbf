@@ -488,29 +488,59 @@ export function BillingView() {
                                           </tr>
                                        </thead>
                                        <tbody className="divide-y divide-slate-100">
-                                          <tr>
-                                             <td className="py-3 text-xs font-black text-black uppercase">
-                                                {(() => { 
-                                                   const ket = activeInvoice.keterangan || "";
-                                                   if (ket.includes("Telur Ayam Horn")) return "Telur Ayam Horn";
-                                                   if (ket.includes("Telur Ayam Arab")) return "Telur Ayam Arab";
-                                                   const parts = ket.split('|');
-                                                   const jenisPart = parts.find(p => p.includes('Jenis:'));
-                                                   if (jenisPart) return jenisPart.replace('Jenis:', '').trim();
-                                                   return "Telur Ayam Horn";
-                                                })()}
-                                                {(() => { 
-                                                   const ket = activeInvoice.keterangan || "";
-                                                   const parts = ket.split('|');
-                                                   const ketPart = parts.find(p => p.includes('Ket:'));
-                                                   if (ketPart) return <span className="block text-[10px] text-black/60 normal-case font-bold mt-0.5">{ketPart.replace('Ket:', '').trim()}</span>;
-                                                   return null;
-                                                })()}
-                                             </td>
-                                             <td className="py-3 text-right text-xs font-black text-black">{(activeInvoice.jumlah_kg || activeInvoice.total_kg || 0).toLocaleString('id-ID')} kg</td>
-                                             <td className="py-3 text-right text-xs font-black text-black">{formatMoney(activeInvoice.harga_per_kg || 0)}</td>
-                                             <td className="py-3 text-right text-xs font-black text-black">{formatMoney(total)}</td>
-                                          </tr>
+                                          {(() => {
+                                             const ket = activeInvoice.keterangan || "";
+                                             const isGrouped = ket.includes('| JSON:');
+                                             if (isGrouped) {
+                                                try {
+                                                   const jsonPart = ket.split('| JSON:')[1];
+                                                   const items = JSON.parse(jsonPart);
+                                                   return items.map((item: any, idx: number) => {
+                                                      const unit = (item.type === 'Telur Ayam Arab' || item.type === 'Telur Puyuh') ? 'btr' : 'kg';
+                                                      const itemName = `${item.type}${item.grade ? ` - ${item.grade}` : ''}`;
+                                                      return (
+                                                         <tr key={idx}>
+                                                            <td className="py-3 text-xs font-black text-black uppercase">
+                                                               {itemName}
+                                                               {item.notes && <span className="block text-[10px] text-black/60 normal-case font-bold mt-0.5">{item.notes}</span>}
+                                                            </td>
+                                                            <td className="py-3 text-right text-xs font-black text-black">{item.qty.toLocaleString('id-ID')} {unit}</td>
+                                                            <td className="py-3 text-right text-xs font-black text-black">{formatMoney(item.price)}</td>
+                                                            <td className="py-3 text-right text-xs font-black text-black">{formatMoney(item.qty * item.price)}</td>
+                                                         </tr>
+                                                      );
+                                                   });
+                                                } catch (e) {
+                                                   // fallback if JSON parsing fails
+                                                }
+                                             }
+                                             
+                                             // Fallback to old single-row rendering
+                                             let itemName = "Telur Ayam Horn";
+                                             if (ket.includes("Telur Ayam Horn")) itemName = "Telur Ayam Horn";
+                                             else if (ket.includes("Telur Ayam Arab")) itemName = "Telur Ayam Arab";
+                                             else {
+                                                const parts = ket.split('|');
+                                                const jenisPart = parts.find(p => p.includes('Jenis:'));
+                                                if (jenisPart) itemName = jenisPart.replace('Jenis:', '').trim();
+                                             }
+                                             
+                                             const parts = ket.split('|');
+                                             const ketPart = parts.find(p => p.includes('Ket:'));
+                                             const unit = ket.toLowerCase().includes('arab') ? 'btr' : 'kg';
+
+                                             return (
+                                                <tr>
+                                                   <td className="py-3 text-xs font-black text-black uppercase">
+                                                      {itemName}
+                                                      {ketPart && <span className="block text-[10px] text-black/60 normal-case font-bold mt-0.5">{ketPart.replace('Ket:', '').trim()}</span>}
+                                                   </td>
+                                                   <td className="py-3 text-right text-xs font-black text-black">{(activeInvoice.jumlah_kg || activeInvoice.total_kg || 0).toLocaleString('id-ID')} {unit}</td>
+                                                   <td className="py-3 text-right text-xs font-black text-black">{formatMoney(activeInvoice.harga_per_kg || 0)}</td>
+                                                   <td className="py-3 text-right text-xs font-black text-black">{formatMoney(total)}</td>
+                                                </tr>
+                                             );
+                                          })()}
                                        </tbody>
                                     </table>
                                  </div>

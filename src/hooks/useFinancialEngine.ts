@@ -69,13 +69,14 @@ export const useFinancialEngine = (
         return j.includes('beli') || j.includes('masuk') || j.includes('supplier') || j.includes('terima') || j.includes('setoran');
       })
       .reduce((s: number, t: any) => s + ((Number(t.total_tagihan) || 0) - (Number(t.dibayar_hari_ini) || 0)), 0),
-    stokTelur: (Number((eggStock as any)?.horn) || 0) + (Number((eggStock as any)?.arab) || 0),
+    stokTelur: (Number((eggStock as any)?.horn) || 0) + (Number((eggStock as any)?.arab) || 0) + (Number((eggStock as any)?.puyuh) || 0),
+    stokTelurIkat: Math.floor((Number((eggStock as any)?.horn) || 0) / 15) + Math.floor((Number((eggStock as any)?.arab) || 0) / 300) + Math.floor((Number((eggStock as any)?.puyuh) || 0) / 10),
     criticalFeed: feedItems.filter((i: any) => (Number(i.stok_sekarang) || 0) <= (Number(i.batas_minimum) || 50)).length
   }), [sisaTelur, sisaPakan, eggTransactions, feedTransactions, eggStock, feedItems, sisaTelur, sisaPakan]);
 
   const recentCombinedActivities = useMemo(() => [
-    ...eggTransactions.slice(0, 15).map(t => ({ ...t, source: 'Telur' })),
-    ...feedTransactions.slice(0, 15).map(t => ({ ...t, source: 'Pakan' })),
+    ...eggTransactions.filter(t => t.jenis_transaksi !== 'Stok Awal').slice(0, 15).map(t => ({ ...t, source: 'Telur' })),
+    ...feedTransactions.filter(t => t.jenis_transaksi !== 'Stok Awal').slice(0, 15).map(t => ({ ...t, source: 'Pakan' })),
     ...afkirTransactions.slice(0, 15).map(t => ({ ...t, source: 'Afkir' }))
   ].sort((a, b) => new Date(b.created_at || b.tanggal).getTime() - new Date(a.created_at || a.tanggal).getTime())
    .slice(0, 15), [eggTransactions, feedTransactions, afkirTransactions]);

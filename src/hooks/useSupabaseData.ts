@@ -84,7 +84,7 @@ export const useSupabaseData = (supabase: any) => {
         const amount = Number(curr.jumlah_kg) || 0;
         const type = (curr.jenis_transaksi || '').toLowerCase();
 
-        const isAdd = type.includes('terima') || type.includes('beli') || type.includes('setoran');
+        const isAdd = type.includes('terima') || type.includes('beli') || type.includes('setoran') || type.includes('stok awal');
         const isSub = type.includes('jual') || type.includes('keluar');
 
         if (isAdd) {

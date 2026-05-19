@@ -190,7 +190,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const [isSubmittingEggs, setIsSubmittingEggs] = useState(false);
   
   const addEggCartRow = useCallback(() => {
-    setEggCart(prev => [...prev, { type: 'Telur Ayam Horn', grade: 'Krem', ikat: 0, qty: 0, price: 0, notes: '' }]);
+    setEggCart(prev => [...prev, { type: 'Telur Ayam Horn', grade: 'Krem', ikat: 0, qty: 0, price: 0, notes: '', inputMode: 'ikat' }]);
   }, []);
 
   const removeEggCartRow = useCallback((index: number) => {
@@ -207,9 +207,13 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
         else newRow.grade = '';
       }
       
-      // Auto calc ikat -> qty for Horn
-      if ((field === 'ikat' || field === 'type') && newRow.type === 'Telur Ayam Horn') {
-        newRow.qty = newRow.ikat * 15;
+      // Auto calc ikat -> qty based on type
+      if (field === 'ikat' || field === 'type' || (field === 'inputMode' && value === 'ikat')) {
+        let multiplier = 15; // Horn default
+        if (newRow.type === 'Telur Ayam Arab') multiplier = 300;
+        else if (newRow.type === 'Telur Puyuh') multiplier = 10;
+        
+        newRow.qty = (newRow.ikat || 0) * multiplier;
       }
       
       return newRow;
@@ -343,21 +347,25 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const effectiveEggStock = useMemo(() => {
     return effectiveEggTransactions.reduce((acc, curr) => {
       const isArab = curr.keterangan?.includes('Jenis: Telur Ayam Arab');
-      const isHorn = !isArab;
+      const isPuyuh = curr.keterangan?.includes('Jenis: Telur Puyuh');
+      const isHorn = !isArab && !isPuyuh;
+      
       const amount = Number(curr.jumlah_kg) || 0;
       const type = (curr.jenis_transaksi || '').toLowerCase();
-      const isAdd = type.includes('terima') || type.includes('beli') || type.includes('setoran');
+      const isAdd = type.includes('terima') || type.includes('beli') || type.includes('setoran') || type.includes('stok awal');
       const isSub = type.includes('jual') || type.includes('keluar');
 
       if (isAdd) {
         if (isHorn) acc.horn += amount;
         else if (isArab) acc.arab += amount;
+        else if (isPuyuh) acc.puyuh += amount;
       } else if (isSub) {
         if (isHorn) acc.horn -= amount;
         else if (isArab) acc.arab -= amount;
+        else if (isPuyuh) acc.puyuh -= amount;
       }
       return acc;
-    }, { horn: 0, arab: 0 });
+    }, { horn: 0, arab: 0, puyuh: 0 });
   }, [effectiveEggTransactions]);
 
   const effectiveFeedItems = useMemo(() => {
@@ -402,28 +410,37 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     
     const jenis = eggModalType === 'terima' ? 'Beli Telur' : 'Jual Telur';
 
-    const insertData = eggCart.map(item => {
-      let itemName = item.type;
-      if (item.grade) itemName += ` - ${item.grade}`;
-      
-      const keterangan = `Mitra: ${mitraName} | Jenis: ${itemName}${item.notes ? ` | Ket: ${item.notes}` : ''}`;
-      const total_harga = item.qty * item.price;
-      
-      return {
-        tanggal: eggDate,
-        jenis_transaksi: jenis,
-        keterangan,
-        jumlah_kg: item.qty, // Note: actually stores quantity (kg or biji depending on type)
-        harga_per_kg: item.price,
-        total_harga: total_harga,
-        jumlah_dibayar: 0
-      };
+    let total_qty = 0;
+    let total_harga = 0;
+    
+    eggCart.forEach(item => {
+      total_qty += item.qty;
+      total_harga += (item.qty * item.price);
     });
 
+    const itemsSummary = eggCart.map(item => {
+      let itemName = item.type;
+      if (item.grade) itemName += ` - ${item.grade}`;
+      const unit = (item.type === 'Telur Ayam Arab' || item.type === 'Telur Puyuh') ? 'btr' : 'kg';
+      return `${itemName} ${item.qty} ${unit}`;
+    }).join(', ');
+
+    const keterangan = `Mitra: ${mitraName} | ${itemsSummary} | JSON:${JSON.stringify(eggCart)}`;
+
+    const insertData = [{
+      tanggal: eggDate,
+      jenis_transaksi: jenis,
+      keterangan,
+      jumlah_kg: total_qty,
+      harga_per_kg: total_qty > 0 ? (total_harga / total_qty) : 0,
+      total_harga: total_harga,
+      jumlah_dibayar: 0
+    }];
+
     if (isSandbox) {
-      const sandboxRows = insertData.map((data, index) => ({
+      const sandboxRows = insertData.map((data) => ({
         ...data,
-        id: `sandbox-${Date.now()}-${index}`,
+        id: `sandbox-${Date.now()}`,
         created_at: new Date().toISOString()
       }));
       setSandboxEggTransactions(prev => [...sandboxRows, ...prev]);

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   TrendingUp, 
   TrendingDown, 
@@ -90,9 +90,14 @@ export function FinanceView() {
   const [rangeMode, setRangeMode] = useState<DateRangeMode>('bulan');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
-  const [selectedEntity, setSelectedEntity] = useState<'MBF' | 'BEF'>('MBF');
   const [detailModal, setDetailModal] = useState<'masuk' | 'keluar' | 'net' | null>(null);
   const [mitraSearch, setMitraSearch] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 8;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [mitraSearch, rangeMode, customStart, customEnd]);
 
   const { start, end } = useMemo(
     () => getDateBounds(rangeMode, customStart, customEnd),
@@ -101,22 +106,22 @@ export function FinanceView() {
 
   // Filter transactions within date range
   const filteredEgg = useMemo(() =>
-    selectedEntity === 'BEF' ? eggTransactions.filter(t => {
+    eggTransactions.filter(t => {
       const d = new Date(t.tanggal || t.created_at);
       return d >= start && d <= end;
-    }) : [], [eggTransactions, start, end, selectedEntity]);
+    }), [eggTransactions, start, end]);
 
   const filteredFeed = useMemo(() =>
-    selectedEntity === 'MBF' ? feedTransactions.filter(t => {
+    feedTransactions.filter(t => {
       const d = new Date(t.tanggal || t.created_at);
       return d >= start && d <= end;
-    }) : [], [feedTransactions, start, end, selectedEntity]);
+    }), [feedTransactions, start, end]);
 
   const filteredAfkir = useMemo(() =>
-    selectedEntity === 'BEF' ? afkirTransactions.filter(t => {
+    afkirTransactions.filter(t => {
       const d = new Date(t.tanggal || t.created_at);
       return d >= start && d <= end;
-    }) : [], [afkirTransactions, start, end, selectedEntity]);
+    }), [afkirTransactions, start, end]);
 
   // Section A: Summary cards breakdown
   const { eggIn, feedIn, eggOut, feedOut, afkirIn } = useMemo(() => {
@@ -213,34 +218,44 @@ export function FinanceView() {
     }));
   }, [filteredEgg, filteredFeed, start, end]);
 
-  // Section C: Mitra Recap Table
+  // Section C: Mitra Recap Table (Combined MBF and BEF)
   const mitraRecap = useMemo(() => {
-    const recapMap: Record<string, { name: string; income: number; expense: number; count: number }> = {};
+    const recapMap: Record<string, { 
+      name: string; 
+      income: number; 
+      expense: number; 
+      count: number;
+      isMBF: boolean;
+      isBEF: boolean;
+    }> = {};
 
-    const process = (trx: any, amount: number, isIncome: boolean) => {
+    const process = (trx: any, amount: number, isIncome: boolean, entity: 'MBF' | 'BEF') => {
       const name = (trx.nama_mitra || trx.mitra_name || trx.keterangan?.replace('Mitra: ', '') || 'Pelanggan Umum').split('|')[0].trim();
       if (!recapMap[name]) {
-        recapMap[name] = { name, income: 0, expense: 0, count: 0 };
+        recapMap[name] = { name, income: 0, expense: 0, count: 0, isMBF: false, isBEF: false };
       }
       if (isIncome) recapMap[name].income += amount;
       else recapMap[name].expense += amount;
       recapMap[name].count += 1;
+      
+      if (entity === 'MBF') recapMap[name].isMBF = true;
+      if (entity === 'BEF') recapMap[name].isBEF = true;
     };
 
     filteredEgg.forEach(t => {
       const jt = t.jenis_transaksi?.toLowerCase() || '';
       const isInc = jt === 'jual telur' || jt === 'jual ke luar';
-      process(t, t.total_harga || 0, isInc);
+      process(t, t.total_harga || 0, isInc, 'BEF');
     });
 
     filteredFeed.forEach(t => {
       const jt = t.jenis_transaksi?.toLowerCase() || '';
       const isInc = jt === 'jual pakan' || jt === 'keluar';
-      process(t, t.total_tagihan || 0, isInc);
+      process(t, t.total_tagihan || 0, isInc, 'MBF');
     });
 
     filteredAfkir.forEach(t => {
-      process(t, t.total_harga || 0, true);
+      process(t, t.total_harga || 0, true, 'BEF');
     });
 
     let results = Object.values(recapMap).sort((a, b) => (b.income + b.expense) - (a.income + a.expense));
@@ -251,7 +266,12 @@ export function FinanceView() {
     }
 
     return results;
-  }, [filteredEgg, filteredFeed, mitraSearch]);
+  }, [filteredEgg, filteredFeed, filteredAfkir, mitraSearch]);
+
+  const totalPages = Math.ceil(mitraRecap.length / pageSize);
+  const paginatedMitra = useMemo(() => {
+    return mitraRecap.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  }, [mitraRecap, currentPage, pageSize]);
 
 
   const rangeModes: { key: DateRangeMode; label: string }[] = [
@@ -270,27 +290,6 @@ export function FinanceView() {
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
               Tren arus kas dan rekap operasional
             </p>
-          </div>
-          
-          <div className="flex p-1 bg-slate-100/50 rounded-xl border border-slate-200/50 w-max">
-            <button
-              onClick={() => setSelectedEntity('MBF')}
-              className={cn(
-                'px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2',
-                selectedEntity === 'MBF' ? 'bg-orange-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              PT MBF (Pakan)
-            </button>
-            <button
-              onClick={() => setSelectedEntity('BEF')}
-              className={cn(
-                'px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2',
-                selectedEntity === 'BEF' ? 'bg-blue-500 text-white shadow-md' : 'text-slate-500 hover:text-slate-700'
-              )}
-            >
-              CV BEF (Telur)
-            </button>
           </div>
         </div>
 
@@ -525,7 +524,7 @@ export function FinanceView() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {mitraRecap.length === 0 ? (
+              {paginatedMitra.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5}>
                     <EmptyState 
@@ -536,12 +535,26 @@ export function FinanceView() {
                   </TableCell>
                 </TableRow>
               ) : (
-                mitraRecap.map((row, i) => {
+                paginatedMitra.map((row, i) => {
                   const netMitra = row.income - row.expense;
                   return (
                     <TableRow key={i} className="group hover:bg-slate-50/50 transition-colors border-slate-50">
                       <TableCell className="pl-10 py-4">
-                        <span className="text-xs font-black text-slate-900 uppercase tracking-tight">{row.name}</span>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-black text-slate-900 uppercase tracking-tight">{row.name}</span>
+                          <div className="flex gap-1.5">
+                            {row.isMBF && (
+                              <span className="px-1.5 py-0.5 bg-orange-50 text-orange-600 rounded text-[8px] font-black uppercase tracking-wider border border-orange-100">
+                                PT MBF
+                              </span>
+                            )}
+                            {row.isBEF && (
+                              <span className="px-1.5 py-0.5 bg-blue-50 text-blue-600 rounded text-[8px] font-black uppercase tracking-wider border border-blue-100">
+                                CV BEF
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="text-center">
                         <span className="px-2 py-0.5 bg-slate-100 rounded-full text-[9px] font-black text-slate-500 uppercase">
@@ -576,13 +589,45 @@ export function FinanceView() {
           </Table>
         </div>
         
-        <div className="px-6 md:px-10 py-4 bg-slate-50/30 border-t border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-2 text-center sm:text-left">
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            Menampilkan {mitraRecap.length} pelanggan dalam periode ini
+        <div className="px-6 md:px-10 py-4 bg-slate-50/30 border-t border-slate-50 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center sm:text-left">
+            Halaman {currentPage} dari {Math.max(1, totalPages)} (Total {mitraRecap.length} pelanggan)
           </p>
-          <div className="flex items-center gap-1">
-             <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-             <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Data Terverifikasi</span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest border-slate-200 text-slate-600 hover:text-slate-900"
+            >
+              Prev
+            </Button>
+            {Array.from({ length: Math.max(1, totalPages) }).map((_, i) => (
+              <Button
+                key={i}
+                variant={currentPage === i + 1 ? "default" : "outline"}
+                size="sm"
+                onClick={() => setCurrentPage(i + 1)}
+                className={cn(
+                  "h-8 w-8 p-0 rounded-lg text-[9px] font-black",
+                  currentPage === i + 1 
+                    ? "bg-orange-500 hover:bg-orange-600 border-orange-500 text-white" 
+                    : "border-slate-200 text-slate-600 hover:text-slate-900"
+                )}
+              >
+                {i + 1}
+              </Button>
+            ))}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages || totalPages === 0}
+              className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest border-slate-200 text-slate-600 hover:text-slate-900"
+            >
+              Next
+            </Button>
           </div>
         </div>
       </div>

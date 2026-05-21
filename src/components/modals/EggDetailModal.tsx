@@ -100,6 +100,9 @@ export const EggDetailModal: React.FC = () => {
                       const items = JSON.parse(jsonPart);
                       return items.map((item: any, idx: number) => {
                         const unit = (item.type === 'Telur Ayam Arab' || item.type === 'Telur Puyuh') ? 'btr' : 'kg';
+                        const qty = Number(item.qty) || 0;
+                        const showIkat = unit === 'kg' && qty > 0 && qty % 15 === 0;
+                        const ikatVal = qty / 15;
                         return (
                           <div key={idx} className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100/50">
                             <div className="flex flex-col">
@@ -109,7 +112,10 @@ export const EggDetailModal: React.FC = () => {
                               {item.notes && <span className="text-[9px] font-medium text-slate-400">{item.notes}</span>}
                             </div>
                             <div className="text-right">
-                              <span className="text-xs font-black text-slate-900 uppercase">{item.qty} {unit}</span>
+                              <span className="text-xs font-black text-slate-900 uppercase">
+                                {qty.toLocaleString('id-ID')} {unit}
+                                {showIkat && ` (${ikatVal} ikat)`}
+                              </span>
                               <p className="text-[9px] font-bold text-slate-400">@ {formatMoney(item.price)}</p>
                             </div>
                           </div>
@@ -122,13 +128,19 @@ export const EggDetailModal: React.FC = () => {
                     const typeMatch = ket.match(/Jenis: ([^|]+)/);
                     const typeName = typeMatch ? typeMatch[1].trim() : "Telur Ayam Ras";
                     const unit = ket.toLowerCase().includes('arab') ? 'btr' : 'kg';
+                    const qty = Number(selectedEggDetail.jumlah_kg) || 0;
+                    const showIkat = unit === 'kg' && qty > 0 && qty % 15 === 0;
+                    const ikatVal = qty / 15;
                     return (
                       <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100/50">
                         <span className="text-[10px] font-black text-slate-900 uppercase tracking-tight">
                           {typeName}
                         </span>
                         <div className="text-right">
-                          <span className="text-xs font-black text-slate-900 uppercase">{(selectedEggDetail.jumlah_kg || 0).toLocaleString('id-ID')} {unit}</span>
+                          <span className="text-xs font-black text-slate-900 uppercase">
+                            {qty.toLocaleString('id-ID')} {unit}
+                            {showIkat && ` (${ikatVal} ikat)`}
+                          </span>
                           <p className="text-[9px] font-bold text-slate-400">@ {formatMoney(selectedEggDetail.harga_per_kg || 0)}</p>
                         </div>
                       </div>

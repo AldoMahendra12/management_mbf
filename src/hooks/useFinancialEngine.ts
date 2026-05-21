@@ -78,7 +78,15 @@ export const useFinancialEngine = (
     ...eggTransactions.filter(t => t.jenis_transaksi !== 'Stok Awal').slice(0, 15).map(t => ({ ...t, source: 'Telur' })),
     ...feedTransactions.filter(t => t.jenis_transaksi !== 'Stok Awal').slice(0, 15).map(t => ({ ...t, source: 'Pakan' })),
     ...afkirTransactions.slice(0, 15).map(t => ({ ...t, source: 'Afkir' }))
-  ].sort((a, b) => new Date(b.created_at || b.tanggal).getTime() - new Date(a.created_at || a.tanggal).getTime())
+  ].sort((a, b) => {
+    const dateA = a.tanggal || (a.created_at ? a.created_at.split('T')[0] : '');
+    const dateB = b.tanggal || (b.created_at ? b.created_at.split('T')[0] : '');
+    
+    if (dateA !== dateB) {
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
+    }
+    return new Date(b.created_at || b.tanggal).getTime() - new Date(a.created_at || a.tanggal).getTime();
+  })
    .slice(0, 15), [eggTransactions, feedTransactions, afkirTransactions]);
 
   // --- FINANCIAL ENGINE ---

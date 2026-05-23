@@ -1,12 +1,11 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { 
   TrendingUp, 
-  Package, 
   FileText, 
   Calendar, 
-  ChevronDown, 
   Printer, 
-  Download 
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import { Button } from '@/components/ui/button';
@@ -16,16 +15,34 @@ import { SectionContainer } from '../layout/SectionContainer';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { cn } from '@/lib/utils';
+import { generateInvoiceCode } from '@/lib/invoice-utils';
 import logoMBF from '../../assets/logo_MBF.png';
 import logoBEF from '../../assets/logo_BEF.png';
 
 import { useDashboard } from '../../contexts/DashboardContext';
 
+// --- Helper: parse egg items from keterangan JSON ---
+function parseEggItems(keterangan: string): { type: string; grade: string; qty: number; price: number; ikat: number; notes: string }[] {
+  if (!keterangan || !keterangan.includes('| JSON:')) return [];
+  try {
+    const jsonPart = keterangan.split('| JSON:')[1];
+    return JSON.parse(jsonPart);
+  } catch { return []; }
+}
+
+// --- Helper: get mitra name from egg transaction ---
+function getEggMitra(t: any): string {
+  return (t.nama_mitra || t.keterangan?.replace('Mitra: ', '')?.split('|')[0]?.trim() || 'Umum').trim();
+}
+
+// --- Helper: get mitra name from feed transaction ---
+function getFeedMitra(t: any): string {
+  return (t.nama_mitra || t.keterangan?.replace('Mitra: ', '')?.split('|')[0]?.trim() || 'Umum').trim();
+}
+
 export function ExportView() {
-  const { eggTransactions, feedTransactions, afkirTransactions, formatMoney, showToast } = useDashboard();
+  const { eggTransactions, feedTransactions, afkirTransactions, feedItems, formatMoney, showToast } = useDashboard();
   
-  const RECENT_EXPORTS: any[] = [];
-  const [reportType, setReportType] = useState('Laporan Penjualan Telur');
   const [selectedEntity, setSelectedEntity] = useState<'MBF' | 'BEF'>('MBF');
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date();
@@ -33,97 +50,260 @@ export function ExportView() {
   });
 
   const getMonthStr = (dateStr: string) => dateStr ? new Date(dateStr).toISOString().substring(0, 7) : '';
-  const filteredEgg = eggTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
-  const filteredFeed = feedTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
-  const filteredAfkir = afkirTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth);
+  
+  // --- FILTERED DATA ---
+  const filteredFeed = useMemo(() => feedTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth), [feedTransactions, selectedMonth]);
+  const filteredEgg = useMemo(() => eggTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth && t.jenis_transaksi !== 'Stok Awal'), [eggTransactions, selectedMonth]);
+  const filteredAfkir = useMemo(() => afkirTransactions.filter(t => getMonthStr(t.tanggal) === selectedMonth), [afkirTransactions, selectedMonth]);
 
-  const printEgg = selectedEntity === 'BEF' ? filteredEgg : [];
   const printFeed = selectedEntity === 'MBF' ? filteredFeed : [];
+  const printEgg = selectedEntity === 'BEF' ? filteredEgg : [];
   const printAfkir = selectedEntity === 'BEF' ? filteredAfkir : [];
 
+  // --- FEED (MBF) CALCULATIONS ---
+  const feedSales = useMemo(() => printFeed.filter(t => {
+    const j = (t.jenis_transaksi || '').toLowerCase();
+    return j.includes('jual') || j.includes('keluar');
+  }), [printFeed]);
+
+  const feedPurchases = useMemo(() => printFeed.filter(t => {
+    const j = (t.jenis_transaksi || '').toLowerCase();
+    return j.includes('beli') || j.includes('masuk');
+  }), [printFeed]);
+
+  const feedSalesTotal = useMemo(() => feedSales.reduce((s, t) => s + (t.total_tagihan || 0), 0), [feedSales]);
+  const feedPurchasesTotal = useMemo(() => feedPurchases.reduce((s, t) => s + (t.total_tagihan || 0), 0), [feedPurchases]);
+  const feedSalesPaid = useMemo(() => feedSales.reduce((s, t) => s + (t.dibayar_hari_ini || 0), 0), [feedSales]);
+  const feedPurchasesPaid = useMemo(() => feedPurchases.reduce((s, t) => s + (t.dibayar_hari_ini || 0), 0), [feedPurchases]);
+
+  // Customer summary for MBF
+  const feedCustomerSummary = useMemo(() => {
+    const map: Record<string, { total: number; paid: number; count: number }> = {};
+    feedSales.forEach(t => {
+      const name = getFeedMitra(t);
+      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0 };
+      map[name].total += (t.total_tagihan || 0);
+      map[name].paid += (t.dibayar_hari_ini || 0);
+      map[name].count += 1;
+    });
+    return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
+  }, [feedSales]);
+
+  // --- EGG (BEF) CALCULATIONS ---
+  const eggSales = useMemo(() => printEgg.filter(t => {
+    const j = (t.jenis_transaksi || '').toLowerCase();
+    return j.includes('jual') || j.includes('keluar');
+  }), [printEgg]);
+
+  const eggPurchases = useMemo(() => printEgg.filter(t => {
+    const j = (t.jenis_transaksi || '').toLowerCase();
+    return j.includes('beli') || j.includes('terima') || j.includes('setoran');
+  }), [printEgg]);
+
+  const eggSalesTotal = useMemo(() => eggSales.reduce((s, t) => s + (t.total_harga || 0), 0), [eggSales]);
+  const eggPurchasesTotal = useMemo(() => eggPurchases.reduce((s, t) => s + (t.total_harga || 0), 0), [eggPurchases]);
+  const eggSalesPaid = useMemo(() => eggSales.reduce((s, t) => s + (t.jumlah_dibayar || 0), 0), [eggSales]);
+  const eggPurchasesPaid = useMemo(() => eggPurchases.reduce((s, t) => s + (t.jumlah_dibayar || 0), 0), [eggPurchases]);
+  const afkirTotal = useMemo(() => printAfkir.reduce((s, t) => s + (t.total_harga || 0), 0), [printAfkir]);
+
+  // Customer summary for BEF
+  const eggCustomerSummary = useMemo(() => {
+    const map: Record<string, { total: number; paid: number; count: number }> = {};
+    eggSales.forEach(t => {
+      const name = getEggMitra(t);
+      if (!map[name]) map[name] = { total: 0, paid: 0, count: 0 };
+      map[name].total += (t.total_harga || 0);
+      map[name].paid += (t.jumlah_dibayar || 0);
+      map[name].count += 1;
+    });
+    return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
+  }, [eggSales]);
+
+  // --- PRINT ---
   const printRefLaporan = useRef<HTMLDivElement>(null);
   const handlePrintLaporan = useReactToPrint({ contentRef: printRefLaporan });
 
-  const handleExportCSV = (type: string) => {
-    let dataToExport: any[] = [];
-    let filename = '';
+  // --- CSV EXPORT ---
+  const handleExportCSV = () => {
+    const monthLabel = new Date(selectedMonth + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
-    if (type === 'telur') {
-      dataToExport = eggTransactions.map(t => ({
-        Tanggal: new Date(t.tanggal).toLocaleDateString('id-ID'),
-        Invoice: t.id,
-        Customer: t.keterangan?.replace('Mitra: ', '') || 'Umum',
-        'Total KG': t.total_kg || t.jumlah_kg,
-        'Harga/KG': t.harga_per_kg,
-        'Total Harga': t.total_harga,
-        'Jumlah Dibayar': t.jumlah_dibayar,
-        'Sisa Piutang': t.total_harga - (t.jumlah_dibayar || 0)
-      }));
-      filename = `Laporan_Telur_${new Date().toISOString().split('T')[0]}.csv`;
-    } else if (type === 'pakan') {
-      dataToExport = feedTransactions.map(t => ({
-        Tanggal: new Date(t.tanggal).toLocaleDateString('id-ID'),
-        Invoice: t.id,
-        Jenis: t.jenis_transaksi,
-        Mitra: t.nama_mitra || t.keterangan?.replace('Mitra: ', '') || 'Umum',
-        'Total Tagihan': t.total_tagihan,
-        'Sudah Dibayar': t.dibayar_hari_ini || 0,
-        'Sisa Piutang/Utang': t.total_tagihan - (t.dibayar_hari_ini || 0)
-      }));
-      filename = `Laporan_Pakan_${new Date().toISOString().split('T')[0]}.csv`;
+    if (selectedEntity === 'MBF') {
+      // Flatten feed transactions with item details
+      const rows: string[][] = [];
+      rows.push(['No', 'No. Invoice', 'Tanggal', 'Jenis', 'Pelanggan/Mitra', 'Nama Bahan', 'Qty', 'Satuan', 'Harga Satuan', 'Subtotal', 'Total Tagihan', 'Sudah Dibayar', 'Sisa', 'Status']);
+      
+      let no = 0;
+      const sorted = [...filteredFeed].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+      sorted.forEach(t => {
+        no++;
+        const inv = generateInvoiceCode(t.id, t.tanggal, 'MBF');
+        const tgl = new Date(t.tanggal).toLocaleDateString('id-ID');
+        const mitra = getFeedMitra(t);
+        const jenis = t.jenis_transaksi || '';
+        const totalTagihan = t.total_tagihan || 0;
+        const paid = t.dibayar_hari_ini || 0;
+        const sisa = totalTagihan - paid;
+        const status = sisa <= 0 ? 'LUNAS' : paid > 0 ? 'SEBAGIAN' : 'BELUM BAYAR';
+
+        if (t.details && t.details.length > 0) {
+          t.details.forEach((d: any, idx: number) => {
+            const bahan = feedItems?.find((f: any) => String(f.id) === String(d.bahan_id));
+            const namaBahan = bahan?.nama_bahan || `ID:${d.bahan_id}`;
+            const satuan = bahan?.satuan || 'sak';
+            rows.push([
+              idx === 0 ? String(no) : '',
+              idx === 0 ? inv : '',
+              idx === 0 ? tgl : '',
+              idx === 0 ? jenis : '',
+              idx === 0 ? mitra : '',
+              namaBahan,
+              String(d.qty || 0),
+              satuan,
+              String(d.harga_satuan || 0),
+              String(d.subtotal || (d.qty * d.harga_satuan) || 0),
+              idx === 0 ? String(totalTagihan) : '',
+              idx === 0 ? String(paid) : '',
+              idx === 0 ? String(sisa) : '',
+              idx === 0 ? status : ''
+            ]);
+          });
+        } else {
+          rows.push([String(no), inv, tgl, jenis, mitra, '-', '-', '-', '-', '-', String(totalTagihan), String(paid), String(sisa), status]);
+        }
+      });
+
+      downloadCSV(rows, `Laporan_PT_MBF_${selectedMonth}.csv`);
+    } else {
+      // Flatten egg transactions with item details from JSON
+      const rows: string[][] = [];
+      rows.push(['No', 'No. Invoice', 'Tanggal', 'Jenis', 'Pelanggan/Mitra', 'Jenis Telur', 'Grade', 'Qty (kg)', 'Ikat', 'Harga/kg', 'Subtotal', 'Total Harga', 'Sudah Dibayar', 'Sisa', 'Status']);
+
+      let no = 0;
+      const sorted = [...filteredEgg].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
+      sorted.forEach(t => {
+        no++;
+        const inv = generateInvoiceCode(t.id, t.tanggal, 'BEF');
+        const tgl = new Date(t.tanggal).toLocaleDateString('id-ID');
+        const mitra = getEggMitra(t);
+        const jenis = t.jenis_transaksi || '';
+        const totalHarga = t.total_harga || 0;
+        const paid = t.jumlah_dibayar || 0;
+        const sisa = totalHarga - paid;
+        const status = sisa <= 0 ? 'LUNAS' : paid > 0 ? 'SEBAGIAN' : 'BELUM BAYAR';
+        const items = parseEggItems(t.keterangan || '');
+
+        if (items.length > 0) {
+          items.forEach((item, idx) => {
+            const qty = item.qty || 0;
+            const ikatVal = qty > 0 && qty % 15 === 0 ? String(qty / 15) : '-';
+            rows.push([
+              idx === 0 ? String(no) : '',
+              idx === 0 ? inv : '',
+              idx === 0 ? tgl : '',
+              idx === 0 ? jenis : '',
+              idx === 0 ? mitra : '',
+              item.type || '',
+              item.grade || '-',
+              String(qty),
+              ikatVal,
+              String(item.price || 0),
+              String(qty * (item.price || 0)),
+              idx === 0 ? String(totalHarga) : '',
+              idx === 0 ? String(paid) : '',
+              idx === 0 ? String(sisa) : '',
+              idx === 0 ? status : ''
+            ]);
+          });
+        } else {
+          rows.push([String(no), inv, tgl, jenis, mitra, '-', '-', String(t.jumlah_kg || 0), '-', String(t.harga_per_kg || 0), '-', String(totalHarga), String(paid), String(sisa), status]);
+        }
+      });
+
+      // Afkir section
+      if (filteredAfkir.length > 0) {
+        rows.push([]);
+        rows.push(['--- PENJUALAN AYAM AFKIR ---']);
+        rows.push(['No', 'Tanggal', 'Mitra', 'Qty (Ekor)', 'Harga/Ekor', 'Total Harga', 'Sudah Dibayar', 'Sisa']);
+        filteredAfkir.forEach((t, i) => {
+          const paid = t.jumlah_dibayar || 0;
+          rows.push([
+            String(i + 1),
+            new Date(t.tanggal).toLocaleDateString('id-ID'),
+            t.mitra_name || '-',
+            String(t.qty_ekor || 0),
+            String(t.harga_per_satuan || 0),
+            String(t.total_harga || 0),
+            String(paid),
+            String((t.total_harga || 0) - paid)
+          ]);
+        });
+      }
+
+      downloadCSV(rows, `Laporan_CV_BEF_${selectedMonth}.csv`);
     }
+    showToast(`Berhasil mengunduh laporan CSV`);
+  };
 
-    if (dataToExport.length === 0) {
-      showToast('Tidak ada data untuk diekspor', 'error');
-      return;
-    }
-
-    const headers = Object.keys(dataToExport[0]).join(',');
-    const csvRows = dataToExport.map(row => Object.values(row).map(val => `"${val}"`).join(','));
-    const csvContent = [headers, ...csvRows].join('\n');
-
+  function downloadCSV(rows: string[][], filename: string) {
+    const BOM = '\uFEFF';
+    const csvContent = BOM + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
     link.download = filename;
     link.click();
-    showToast(`Berhasil mengunduh ${filename}`);
+  }
+
+  // --- PERIOD LABEL ---
+  const periodLabel = new Date(selectedMonth + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+
+  // --- Lookup feed item name ---
+  const getBahanName = (bahanId: string) => {
+    const item = feedItems?.find((f: any) => String(f.id) === String(bahanId));
+    return item?.nama_bahan || `ID:${bahanId}`;
+  };
+  const getBahanSatuan = (bahanId: string) => {
+    const item = feedItems?.find((f: any) => String(f.id) === String(bahanId));
+    return item?.satuan || 'sak';
   };
 
   return (
     <SectionContainer className="space-y-6">
+      {/* Page Header */}
       <div className="flex items-center justify-between bg-white border border-slate-200/60 rounded-xl p-6 shadow-sm">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Ekspor Data</h1>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Unduh laporan operasional dan finansial untuk arsip</p>
+          <h1 className="text-2xl font-black text-slate-900 tracking-tight">Laporan Keuangan</h1>
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-relaxed">Laporan keuangan rinci untuk arsip dan akuntan</p>
         </div>
-        
-
-
-        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest px-2">Terakhir diekspor: -</p>
       </div>
 
-      {/* Financial Report Entity Selection */}
+      {/* Entity Selection Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-        {[
+        {([
           { 
             title: 'Laporan Keuangan PT MBF', 
             entity: 'MBF' as const,
             icon: TrendingUp, 
-            desc: 'Rekapitulasi finansial lengkap untuk PT Mitra Barokah Farm mencakup arus kas, margin, dan laba rugi.',
+            desc: 'Rekapitulasi penjualan & pembelian pakan ternak lengkap dengan rincian item per transaksi.',
           },
           { 
             title: 'Laporan Keuangan CV BEF', 
             entity: 'BEF' as const,
             icon: FileText, 
-            desc: 'Rekapitulasi finansial lengkap untuk CV Barokah Eka Farm mencakup arus kas, margin, dan laba rugi.',
+            desc: 'Rekapitulasi penjualan & pembelian telur lengkap dengan rincian item dan konversi ikat.',
           },
-        ].map((card, i) => (
-          <Card key={i} className="border-slate-200/60 shadow-sm group hover:border-orange-200/50 transition-all flex flex-col relative overflow-hidden">
+        ]).map((card, i) => (
+          <Card key={i} className={cn(
+            "border-slate-200/60 shadow-sm group hover:border-orange-200/50 transition-all flex flex-col relative overflow-hidden",
+            selectedEntity === card.entity && "ring-2 ring-orange-500/30 border-orange-200"
+          )}>
               <div className="absolute top-0 right-0 w-32 h-32 -mr-16 -mt-16 rounded-full opacity-[0.03] transition-transform group-hover:scale-150 bg-orange-600" />
               
               <CardHeader className="p-8 pb-4">
-                <div className="w-12 h-12 rounded-xl flex items-center justify-center transition-all mb-6 shadow-sm bg-orange-500 text-white">
+                <div className={cn(
+                  "w-12 h-12 rounded-xl flex items-center justify-center transition-all mb-6 shadow-sm",
+                  selectedEntity === card.entity ? "bg-orange-500 text-white" : "bg-slate-100 text-slate-500"
+                )}>
                     <card.icon size={24} />
                 </div>
                 <CardTitle className="text-lg font-black text-slate-900 uppercase tracking-tight">{card.title}</CardTitle>
@@ -131,6 +311,7 @@ export function ExportView() {
               </CardHeader>
               
               <CardContent className="p-8 pt-4 space-y-6 mt-auto">
+                {/* Month Picker */}
                 <div className="flex items-center gap-4">
                     <div 
                       className="flex-1 flex items-center gap-2 p-2.5 bg-slate-100 hover:bg-slate-200 transition-colors rounded-xl border border-slate-200 relative cursor-pointer group"
@@ -157,32 +338,41 @@ export function ExportView() {
                       />
                     </div>
                     <Badge className="text-[9px] font-black uppercase px-2 py-1 rounded-lg border-none shadow-none bg-orange-50 text-orange-600">
-                      FULL REKAP
+                      RINCI
                     </Badge>
                 </div>
                 
-                <div className="grid grid-cols-2 gap-3">
+                {/* Action Buttons */}
+                <div className="grid grid-cols-3 gap-2">
                     <Button 
                       onClick={() => {
                         setSelectedEntity(card.entity);
-                        setReportType(card.title);
-                        setTimeout(() => handlePrintLaporan(), 100);
+                        setTimeout(() => handlePrintLaporan(), 150);
                       }}
-                      className="h-11 text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95 bg-orange-600 text-white shadow-orange-600/10"
+                      className="h-11 text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95 bg-orange-600 text-white shadow-orange-600/10"
                     >
-                      <Printer size={14} className="mr-2" />
-                      PDF REPORT
+                      <Printer size={14} className="mr-1.5" />
+                      CETAK PDF
                     </Button>
                     <Button 
                       onClick={() => {
                         setSelectedEntity(card.entity);
-                        setReportType(card.title);
+                        handleExportCSV();
+                      }}
+                      className="h-11 text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95 bg-emerald-600 text-white shadow-emerald-600/10"
+                    >
+                      <FileSpreadsheet size={14} className="mr-1.5" />
+                      EXCEL CSV
+                    </Button>
+                    <Button 
+                      onClick={() => {
+                        setSelectedEntity(card.entity);
                         setTimeout(() => document.getElementById('print-preview')?.scrollIntoView({ behavior: 'smooth' }), 100);
                       }}
                       variant="outline"
-                      className="h-11 text-[10px] font-black uppercase tracking-widest rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50"
+                      className="h-11 text-[9px] font-black uppercase tracking-widest rounded-xl border-slate-200 text-slate-600 hover:bg-slate-50"
                     >
-                      <FileText size={14} className="mr-2" />
+                      <FileText size={14} className="mr-1.5" />
                       PREVIEW
                     </Button>
                 </div>
@@ -199,161 +389,531 @@ export function ExportView() {
             <Badge variant="outline" className="text-[10px] font-black border-slate-200 text-slate-400 px-3 py-1">
               {selectedEntity === 'MBF' ? 'ENTITY: PT MBF' : 'ENTITY: CV BEF'}
             </Badge>
+            <Badge variant="outline" className="text-[10px] font-black border-slate-200 text-slate-400 px-3 py-1">
+              {periodLabel.toUpperCase()}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="p-4 md:p-12 bg-slate-100/50 flex flex-col items-center w-full">
             <div className="w-full flex justify-center overflow-hidden py-4 min-h-[300px] md:min-h-0">
               <div className="origin-top transition-transform duration-500 scale-[0.4] sm:scale-[0.6] md:scale-100 mb-[-650px] sm:mb-[-400px] md:mb-0" style={{ width: '800px' }}>
-                <div id="print-preview" ref={printRefLaporan} className="bg-white w-[800px] h-auto min-h-[500px] shadow-2xl shadow-slate-200 p-16 flex flex-col gap-10 text-slate-800 ring-1 ring-slate-200 relative">
-                  {/* Continuous Form Perforation Effect (Optional/Aesthetic) */}
+                <div id="print-preview" ref={printRefLaporan} className="bg-white w-[800px] h-auto min-h-[500px] shadow-2xl shadow-slate-200 p-12 flex flex-col gap-8 text-slate-800 ring-1 ring-slate-200 relative print-content">
+                  {/* Perforation Effect */}
                   <div className="absolute left-2 top-0 bottom-0 w-4 flex flex-col justify-around py-4 gap-4 opacity-10">
-                    {[...Array(20)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-slate-900" />)}
+                    {[...Array(30)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-slate-900" />)}
                   </div>
                   <div className="absolute right-2 top-0 bottom-0 w-4 flex flex-col justify-around py-4 gap-4 opacity-10">
-                    {[...Array(20)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-slate-900" />)}
+                    {[...Array(30)].map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-slate-900" />)}
                   </div>
 
-              {/* Official Letterhead */}
-              <div className="flex items-center justify-between border-b-[3px] border-slate-900 pb-8">
-                  <div className="flex gap-6 items-center">
-                    <img 
-                      src={selectedEntity === 'MBF' ? logoMBF : logoBEF} 
-                      alt="Logo" 
-                      className="w-20 h-20 object-contain" 
-                    />
+                  {/* ===== LETTERHEAD ===== */}
+                  <div className="flex items-center justify-between border-b-[3px] border-slate-900 pb-6">
+                    <div className="flex gap-5 items-center">
+                      <img 
+                        src={selectedEntity === 'MBF' ? logoMBF : logoBEF} 
+                        alt="Logo" 
+                        className="w-16 h-16 object-contain" 
+                      />
+                      <div>
+                        <h1 className="text-2xl font-black tracking-tighter text-slate-900 uppercase">
+                          {selectedEntity === 'MBF' ? 'PT. MITRA BAROKAH FARM' : 'CV BERKAH EGG FARM'}
+                        </h1>
+                        <p className="text-[11px] font-black text-slate-900 uppercase tracking-widest leading-tight mt-1">
+                          {selectedEntity === 'MBF' 
+                            ? 'Divisi Distribusi Pakan Ternak' 
+                            : 'Pengepul & Supplier Telur Ayam'}
+                          <br/>Tulungagung, Jawa Timur
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <div className="bg-slate-900 text-white px-3 py-1.5 rounded-lg mb-1.5 shadow-sm">
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em]">Laporan Keuangan Rinci</p>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Periode</p>
+                        <p className="text-[11px] font-black text-slate-900 uppercase tracking-tight">{periodLabel}</p>
+                      </div>
+                      <div className="flex flex-col items-end mt-0.5">
+                        <p className="text-[7px] font-bold text-slate-300 uppercase tracking-[0.2em]">Dicetak</p>
+                        <p className="text-[9px] font-bold text-slate-400 tabular-nums">
+                          {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ===== EXECUTIVE SUMMARY ===== */}
+                  {selectedEntity === 'MBF' ? (
+                    <div className="grid grid-cols-4 gap-3">
+                      {[
+                        { label: 'Penjualan Pakan', val: feedSalesTotal, color: 'text-emerald-700' },
+                        { label: 'Pembelian Stok', val: feedPurchasesTotal, color: 'text-blue-700' },
+                        { label: 'Piutang Penjualan', val: feedSalesTotal - feedSalesPaid, color: 'text-orange-600' },
+                        { label: 'Laba Kotor', val: feedSalesTotal - feedPurchasesTotal, color: feedSalesTotal - feedPurchasesTotal >= 0 ? 'text-emerald-700' : 'text-rose-600' },
+                      ].map((s, i) => (
+                        <div key={i} className="bg-slate-50 p-4 rounded-lg flex flex-col gap-1 border border-slate-100">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
+                          <p className={cn("text-xs font-black tabular-nums", s.color)}>{formatMoney(s.val, false)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 gap-3">
+                      {[
+                        { label: 'Penjualan Telur', val: eggSalesTotal + afkirTotal, color: 'text-emerald-700' },
+                        { label: 'Pembelian Telur', val: eggPurchasesTotal, color: 'text-blue-700' },
+                        { label: 'Piutang Penjualan', val: (eggSalesTotal - eggSalesPaid), color: 'text-orange-600' },
+                        { label: 'Laba Kotor', val: (eggSalesTotal + afkirTotal) - eggPurchasesTotal, color: (eggSalesTotal + afkirTotal) - eggPurchasesTotal >= 0 ? 'text-emerald-700' : 'text-rose-600' },
+                      ].map((s, i) => (
+                        <div key={i} className="bg-slate-50 p-4 rounded-lg flex flex-col gap-1 border border-slate-100">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
+                          <p className={cn("text-xs font-black tabular-nums", s.color)}>{formatMoney(s.val, false)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* ===== CUSTOMER SUMMARY ===== */}
+                  {selectedEntity === 'MBF' && feedCustomerSummary.length > 0 && (
                     <div>
-                      <h1 className="text-3xl font-black tracking-tighter text-slate-900 uppercase">
-                        {selectedEntity === 'MBF' ? 'PT. MITRA BAROKAH FARM' : 'CV BERKAH EGG FARM'}
-                      </h1>
-                      <p className="text-[12px] font-black text-slate-900 uppercase tracking-widest leading-tight mt-1.5">
-                        {selectedEntity === 'MBF' 
-                          ? 'Divisi Distribusi Pakan Ternak' 
-                          : 'Pengepul & Supplier Telur Ayam'}
-                        <br/>Tulungagung, Jawa Timur
-                      </p>
+                      <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-3 border-b pb-1.5">Rekap Penjualan Per Pelanggan</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 w-8">No</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Pelanggan</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-center">Trx</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Total Tagihan</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Sudah Bayar</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Sisa Piutang</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {feedCustomerSummary.map(([name, data], i) => (
+                            <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
+                              <TableCell className="py-1.5 text-[9px] font-bold text-slate-400 p-0">{i + 1}</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-black text-slate-900 uppercase p-0">{name}</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-bold text-slate-500 text-center p-0">{data.count}x</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-black text-slate-900 text-right tabular-nums p-0">{formatMoney(data.total, false)}</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-bold text-emerald-600 text-right tabular-nums p-0">{formatMoney(data.paid, false)}</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-black text-right tabular-nums p-0 pr-2">
+                                <span className={data.total - data.paid > 0 ? 'text-orange-600' : 'text-emerald-600'}>
+                                  {formatMoney(data.total - data.paid, false)}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                  </div>
-                  <div className="flex flex-col items-end gap-1.5">
-                    <div className="bg-slate-900 text-white px-4 py-2 rounded-lg mb-2 shadow-sm">
-                      <p className="text-[10px] font-black uppercase tracking-[0.2em]">{reportType}</p>
-                    </div>
-                    <div className="flex flex-col items-end">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Periode Laporan</p>
-                      <p className="text-[12px] font-black text-slate-900 uppercase tracking-tight mt-0.5">
-                        {new Date(selectedMonth + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end mt-1">
-                      <p className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.2em]">Dicetak Pada</p>
-                      <p className="text-[10px] font-bold text-slate-400 tabular-nums">
-                        {new Date().toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' })}
-                      </p>
-                    </div>
-                  </div>
-              </div>
+                  )}
 
-              {/* Report Summary */}
-              <div className="grid grid-cols-3 gap-6">
-                {[
-                    { label: 'Total Pemasukan', val: formatMoney(
-                      printEgg.reduce((s, t) => s + (t.total_harga || 0), 0) + 
-                      printFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) +
-                      printAfkir.reduce((s, t) => s + (t.total_harga || 0), 0)
-                      , false) 
-                    },
-                    { label: 'Total Pengeluaran', val: formatMoney(
-                      printFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + 
-                      printEgg.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0)
-                      , false) 
-                    },
-                    { label: 'Selisih Bersih', val: formatMoney(
-                      (printEgg.reduce((s, t) => s + (t.total_harga || 0), 0) + printFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('jual')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + printAfkir.reduce((s, t) => s + (t.total_harga || 0), 0)) - 
-                      (printFeed.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli') || t.jenis_transaksi?.toLowerCase().includes('masuk')).reduce((s, t) => s + (t.total_tagihan || 0), 0) + printEgg.filter(t => t.jenis_transaksi?.toLowerCase().includes('beli')).reduce((s, t) => s + (t.total_harga || 0), 0))
-                      , false) 
-                    },
-                ].map((s, i) => (
-                    <div key={i} className="bg-slate-50 p-6 rounded-xl flex flex-col gap-1.5 border border-slate-100">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{s.label}</p>
-                      <p className="text-sm font-black text-slate-900 tabular-nums">{s.val}</p>
+                  {selectedEntity === 'BEF' && eggCustomerSummary.length > 0 && (
+                    <div>
+                      <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-3 border-b pb-1.5">Rekap Penjualan Per Pelanggan</h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 w-8">No</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Pelanggan</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-center">Trx</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Total Tagihan</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Sudah Bayar</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Sisa Piutang</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {eggCustomerSummary.map(([name, data], i) => (
+                            <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
+                              <TableCell className="py-1.5 text-[9px] font-bold text-slate-400 p-0">{i + 1}</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-black text-slate-900 uppercase p-0">{name}</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-bold text-slate-500 text-center p-0">{data.count}x</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-black text-slate-900 text-right tabular-nums p-0">{formatMoney(data.total, false)}</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-bold text-emerald-600 text-right tabular-nums p-0">{formatMoney(data.paid, false)}</TableCell>
+                              <TableCell className="py-1.5 text-[9px] font-black text-right tabular-nums p-0 pr-2">
+                                <span className={data.total - data.paid > 0 ? 'text-orange-600' : 'text-emerald-600'}>
+                                  {formatMoney(data.total - data.paid, false)}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
                     </div>
-                ))}
-              </div>
+                  )}
 
-              <div className="flex-1">
-                  <h3 className="text-[10px] font-black text-slate-900 uppercase tracking-[0.2em] mb-4 border-b pb-2">Rincian Transaksi Konsolidasi</h3>
-                  <Table>
-                    <TableHeader>
-                        <TableRow className="border-b-2 border-slate-100 hover:bg-transparent">
-                          <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Tanggal</TableHead>
-                          <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0">Keterangan</TableHead>
-                          <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0 text-right">Debit</TableHead>
-                          <TableHead className="h-10 text-[10px] font-black uppercase text-slate-400 p-0 text-right pr-4">Kredit</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {(() => {
-                          const combined = [...printEgg, ...printFeed, ...printAfkir];
-                          if (combined.length === 0) {
-                            return (
-                              <TableRow>
-                                <TableCell colSpan={4}>
-                                  <EmptyState 
-                                    icon={FileText} 
-                                    title="Laporan Kosong" 
-                                    description="Tidak ada aktivitas finansial yang tercatat untuk periode ini." 
-                                  />
+                  {/* ===== DETAILED SALES TRANSACTIONS ===== */}
+                  {selectedEntity === 'MBF' && (
+                    <div>
+                      <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-3 border-b pb-1.5">
+                        Rincian Penjualan Pakan ({feedSales.length} Transaksi)
+                      </h3>
+                      {feedSales.length > 0 ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 w-8">No</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Invoice</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Tgl</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Pelanggan</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Nama Bahan</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Qty</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Subtotal</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {[...feedSales].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                              const details = t.details || [];
+                              const sisa = (t.total_tagihan || 0) - (t.dibayar_hari_ini || 0);
+                              const inv = generateInvoiceCode(t.id, t.tanggal, 'MBF');
+
+                              if (details.length === 0) {
+                                return (
+                                  <TableRow key={tIdx} className="border-b border-slate-100 hover:bg-transparent">
+                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{tIdx + 1}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-black text-slate-700 p-0">{inv}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-black text-slate-900 uppercase p-0">{getFeedMitra(t)}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] text-slate-400 italic p-0">-</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] text-slate-400 text-right p-0">-</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] text-slate-400 text-right p-0">-</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-black text-slate-900 text-right tabular-nums p-0">{formatMoney(t.total_tagihan || 0, false)}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-black text-right p-0 pr-2">
+                                      <span className={sisa <= 0 ? 'text-emerald-600' : 'text-orange-600'}>{sisa <= 0 ? 'LUNAS' : 'BELUM'}</span>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              }
+
+                              return details.map((d: any, dIdx: number) => (
+                                <TableRow key={`${tIdx}-${dIdx}`} className={cn(
+                                  "hover:bg-transparent",
+                                  dIdx === details.length - 1 ? "border-b border-slate-100" : "border-b border-slate-50/50"
+                                )}>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-400 p-0">{dIdx === 0 ? tIdx + 1 : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-black text-slate-700 p-0">{dIdx === 0 ? inv : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-500 p-0">{dIdx === 0 ? new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' }) : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-black text-slate-900 uppercase p-0">{dIdx === 0 ? getFeedMitra(t) : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-700 p-0">{getBahanName(d.bahan_id)} <span className="text-slate-400">({getBahanSatuan(d.bahan_id)})</span></TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(d.qty || 0).toLocaleString('id-ID')}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(d.harga_satuan || 0, false)}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-black text-slate-900 text-right tabular-nums p-0">{formatMoney(d.subtotal || (d.qty * d.harga_satuan) || 0, false)}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-black text-right p-0 pr-2">
+                                    {dIdx === 0 && <span className={sisa <= 0 ? 'text-emerald-600' : 'text-orange-600'}>{sisa <= 0 ? 'LUNAS' : 'BELUM'}</span>}
+                                  </TableCell>
+                                </TableRow>
+                              ));
+                            })}
+                            {/* Sales Total Row */}
+                            <TableRow className="border-t-2 border-slate-900 hover:bg-transparent">
+                              <TableCell colSpan={7} className="py-2 text-[9px] font-black text-slate-900 uppercase tracking-widest p-0">Total Penjualan</TableCell>
+                              <TableCell className="py-2 text-[10px] font-black text-emerald-700 text-right tabular-nums p-0">{formatMoney(feedSalesTotal, false)}</TableCell>
+                              <TableCell className="p-0" />
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <p className="text-[9px] font-bold text-slate-400 italic py-4">Tidak ada transaksi penjualan pakan di periode ini.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ===== MBF PURCHASES DETAIL ===== */}
+                  {selectedEntity === 'MBF' && feedPurchases.length > 0 && (
+                    <div>
+                      <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-3 border-b pb-1.5">
+                        Rincian Pembelian Stok ({feedPurchases.length} Transaksi)
+                      </h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 w-8">No</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Invoice</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Tgl</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Supplier</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Nama Bahan</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Qty</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Subtotal</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Status</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {[...feedPurchases].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                            const details = t.details || [];
+                            const sisa = (t.total_tagihan || 0) - (t.dibayar_hari_ini || 0);
+                            const inv = generateInvoiceCode(t.id, t.tanggal, 'MBF');
+
+                            if (details.length === 0) {
+                              return (
+                                <TableRow key={tIdx} className="border-b border-slate-100 hover:bg-transparent">
+                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{tIdx + 1}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-black text-slate-700 p-0">{inv}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-black text-slate-900 uppercase p-0">{getFeedMitra(t)}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] text-slate-400 italic p-0">-</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] text-slate-400 text-right p-0">-</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] text-slate-400 text-right p-0">-</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-black text-slate-900 text-right tabular-nums p-0">{formatMoney(t.total_tagihan || 0, false)}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-black text-right p-0 pr-2">
+                                    <span className={sisa <= 0 ? 'text-emerald-600' : 'text-blue-600'}>{sisa <= 0 ? 'LUNAS' : 'BELUM'}</span>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            }
+
+                            return details.map((d: any, dIdx: number) => (
+                              <TableRow key={`${tIdx}-${dIdx}`} className={cn(
+                                "hover:bg-transparent",
+                                dIdx === details.length - 1 ? "border-b border-slate-100" : "border-b border-slate-50/50"
+                              )}>
+                                <TableCell className="py-1 text-[8px] font-bold text-slate-400 p-0">{dIdx === 0 ? tIdx + 1 : ''}</TableCell>
+                                <TableCell className="py-1 text-[8px] font-black text-slate-700 p-0">{dIdx === 0 ? inv : ''}</TableCell>
+                                <TableCell className="py-1 text-[8px] font-bold text-slate-500 p-0">{dIdx === 0 ? new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' }) : ''}</TableCell>
+                                <TableCell className="py-1 text-[8px] font-black text-slate-900 uppercase p-0">{dIdx === 0 ? getFeedMitra(t) : ''}</TableCell>
+                                <TableCell className="py-1 text-[8px] font-bold text-slate-700 p-0">{getBahanName(d.bahan_id)} <span className="text-slate-400">({getBahanSatuan(d.bahan_id)})</span></TableCell>
+                                <TableCell className="py-1 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(d.qty || 0).toLocaleString('id-ID')}</TableCell>
+                                <TableCell className="py-1 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(d.harga_satuan || 0, false)}</TableCell>
+                                <TableCell className="py-1 text-[8px] font-black text-slate-900 text-right tabular-nums p-0">{formatMoney(d.subtotal || (d.qty * d.harga_satuan) || 0, false)}</TableCell>
+                                <TableCell className="py-1 text-[8px] font-black text-right p-0 pr-2">
+                                  {dIdx === 0 && <span className={sisa <= 0 ? 'text-emerald-600' : 'text-blue-600'}>{sisa <= 0 ? 'LUNAS' : 'BELUM'}</span>}
                                 </TableCell>
                               </TableRow>
-                            );
-                          }
+                            ));
+                          })}
+                          <TableRow className="border-t-2 border-slate-900 hover:bg-transparent">
+                            <TableCell colSpan={7} className="py-2 text-[9px] font-black text-slate-900 uppercase tracking-widest p-0">Total Pembelian</TableCell>
+                            <TableCell className="py-2 text-[10px] font-black text-blue-700 text-right tabular-nums p-0">{formatMoney(feedPurchasesTotal, false)}</TableCell>
+                            <TableCell className="p-0" />
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
 
-                          return combined.sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).slice(0, 30).map((t, i) => {
-                            const isAfkir = !t.jenis_transaksi && t.mitra_name; 
-                            const isIncome = isAfkir || t.jenis_transaksi?.toLowerCase().includes('jual') || t.jenis_transaksi?.toLowerCase().includes('keluar') || (t.total_harga && !t.jenis_transaksi?.toLowerCase().includes('beli'));
-                            const amount = t.total_harga || t.total_tagihan || 0;
-                            const customer = (t.mitra_name || t.nama_mitra || t.keterangan?.replace('Mitra: ', '') || 'Umum').split('|')[0].trim();
-                            const description = isAfkir ? 'Penjualan Ayam Afkir' : (t.jenis_transaksi || 'Penjualan Telur');
-                            
-                            return (
-                              <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
-                                  <TableCell className="py-3 text-[10px] font-bold text-slate-400">{new Date(t.tanggal).toLocaleDateString('id-ID', {day: '2-digit', month: '2-digit'})}</TableCell>
-                                  <TableCell className="py-3 text-left text-[11px] font-black uppercase text-slate-900">
-                                    {description} - {customer}
-                                  </TableCell>
-                                  <TableCell className="py-3 text-right text-[11px] font-black text-blue-600 tabular-nums">{!isIncome ? formatMoney(amount, false) : '-'}</TableCell>
-                                  <TableCell className="py-3 text-right pr-4 text-[11px] font-black text-emerald-600 tabular-nums">{isIncome ? formatMoney(amount, false) : '-'}</TableCell>
-                              </TableRow>
-                            );
-                          });
-                        })()}
-                    </TableBody>
-                  </Table>
-              </div>
+                  {/* ===== BEF SALES DETAIL ===== */}
+                  {selectedEntity === 'BEF' && (
+                    <div>
+                      <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-3 border-b pb-1.5">
+                        Rincian Penjualan Telur ({eggSales.length} Transaksi)
+                      </h3>
+                      {eggSales.length > 0 ? (
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 w-6">No</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Invoice</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Tgl</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Pelanggan</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Jenis & Grade</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Kg</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Ikat</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga/kg</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Subtotal</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {[...eggSales].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                              const items = parseEggItems(t.keterangan || '');
+                              const mitra = getEggMitra(t);
+                              const inv = generateInvoiceCode(t.id, t.tanggal, 'BEF');
 
-              {/* Signature Section */}
-              <div className="grid grid-cols-2 gap-20 mt-10">
-                <div className="flex flex-col items-center">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-16">Dibuat Oleh,</p>
-                  <div className="w-40 h-[1px] bg-slate-900 mb-1" />
-                  <p className="text-[10px] font-black uppercase tracking-tighter text-slate-900">Admin Keuangan</p>
-                </div>
-                <div className="flex flex-col items-center">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-16">Mengetahui,</p>
-                  <div className="w-40 h-[1px] bg-slate-900 mb-1" />
-                  <p className="text-[10px] font-black uppercase tracking-tighter text-slate-900">
-                    {selectedEntity === 'MBF' ? 'Pimpinan PT MBF' : 'Pimpinan CV BEF'}
-                  </p>
-                </div>
-              </div>
+                              if (items.length === 0) {
+                                return (
+                                  <TableRow key={tIdx} className="border-b border-slate-100 hover:bg-transparent">
+                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{tIdx + 1}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-black text-slate-700 p-0">{inv}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-black text-slate-900 uppercase p-0">{mitra}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] text-slate-400 italic p-0">Telur Ayam</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(t.jumlah_kg || 0).toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 text-right tabular-nums p-0">{(t.jumlah_kg || 0) % 15 === 0 && t.jumlah_kg > 0 ? (t.jumlah_kg / 15) : '-'}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(t.harga_per_kg || 0, false)}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(t.total_harga || 0, false)}</TableCell>
+                                  </TableRow>
+                                );
+                              }
 
-              <div className="border-t-2 border-slate-100 pt-8 flex justify-between items-center opacity-50">
-                  <p className="text-[9px] font-bold italic text-slate-400">Dokumen ini merupakan laporan resmi yang dihasilkan secara otomatis oleh Sistem Admin MBF.</p>
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-900">Halaman 1 / 1</p>
-              </div>
+                              return items.map((item, iIdx) => {
+                                const qty = item.qty || 0;
+                                const ikatStr = qty > 0 && qty % 15 === 0 ? String(qty / 15) : '-';
+                                return (
+                                  <TableRow key={`${tIdx}-${iIdx}`} className={cn(
+                                    "hover:bg-transparent",
+                                    iIdx === items.length - 1 ? "border-b border-slate-100" : "border-b border-slate-50/50"
+                                  )}>
+                                    <TableCell className="py-1 text-[8px] font-bold text-slate-400 p-0">{iIdx === 0 ? tIdx + 1 : ''}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-black text-slate-700 p-0">{iIdx === 0 ? inv : ''}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-bold text-slate-500 p-0">{iIdx === 0 ? new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' }) : ''}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-black text-slate-900 uppercase p-0">{iIdx === 0 ? mitra : ''}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-bold text-slate-700 p-0">{item.type}{item.grade ? ` - ${item.grade}` : ''}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{qty.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-bold text-slate-400 text-right tabular-nums p-0">{ikatStr}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(item.price || 0, false)}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(qty * (item.price || 0), false)}</TableCell>
+                                  </TableRow>
+                                );
+                              });
+                            })}
+                            <TableRow className="border-t-2 border-slate-900 hover:bg-transparent">
+                              <TableCell colSpan={8} className="py-2 text-[9px] font-black text-slate-900 uppercase tracking-widest p-0">Total Penjualan Telur</TableCell>
+                              <TableCell className="py-2 text-[10px] font-black text-emerald-700 text-right tabular-nums p-0 pr-2">{formatMoney(eggSalesTotal, false)}</TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                      ) : (
+                        <p className="text-[9px] font-bold text-slate-400 italic py-4">Tidak ada transaksi penjualan telur di periode ini.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ===== BEF PURCHASES DETAIL ===== */}
+                  {selectedEntity === 'BEF' && eggPurchases.length > 0 && (
+                    <div>
+                      <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-3 border-b pb-1.5">
+                        Rincian Pembelian Telur dari Supplier ({eggPurchases.length} Transaksi)
+                      </h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 w-6">No</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Invoice</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Tgl</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Supplier</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Jenis & Grade</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Kg</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Ikat</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga/kg</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Subtotal</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {[...eggPurchases].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                            const items = parseEggItems(t.keterangan || '');
+                            const mitra = getEggMitra(t);
+                            const inv = generateInvoiceCode(t.id, t.tanggal, 'BEF');
+
+                            if (items.length === 0) {
+                              return (
+                                <TableRow key={tIdx} className="border-b border-slate-100 hover:bg-transparent">
+                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{tIdx + 1}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-black text-slate-700 p-0">{inv}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-black text-slate-900 uppercase p-0">{mitra}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] text-slate-400 italic p-0">Telur Ayam</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(t.jumlah_kg || 0).toLocaleString('id-ID')}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 text-right tabular-nums p-0">{(t.jumlah_kg || 0) % 15 === 0 && t.jumlah_kg > 0 ? (t.jumlah_kg / 15) : '-'}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(t.harga_per_kg || 0, false)}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(t.total_harga || 0, false)}</TableCell>
+                                </TableRow>
+                              );
+                            }
+
+                            return items.map((item, iIdx) => {
+                              const qty = item.qty || 0;
+                              const ikatStr = qty > 0 && qty % 15 === 0 ? String(qty / 15) : '-';
+                              return (
+                                <TableRow key={`${tIdx}-${iIdx}`} className={cn(
+                                  "hover:bg-transparent",
+                                  iIdx === items.length - 1 ? "border-b border-slate-100" : "border-b border-slate-50/50"
+                                )}>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-400 p-0">{iIdx === 0 ? tIdx + 1 : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-black text-slate-700 p-0">{iIdx === 0 ? inv : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-500 p-0">{iIdx === 0 ? new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' }) : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-black text-slate-900 uppercase p-0">{iIdx === 0 ? mitra : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-700 p-0">{item.type}{item.grade ? ` - ${item.grade}` : ''}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{qty.toLocaleString('id-ID')}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-400 text-right tabular-nums p-0">{ikatStr}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(item.price || 0, false)}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(qty * (item.price || 0), false)}</TableCell>
+                                </TableRow>
+                              );
+                            });
+                          })}
+                          <TableRow className="border-t-2 border-slate-900 hover:bg-transparent">
+                            <TableCell colSpan={8} className="py-2 text-[9px] font-black text-slate-900 uppercase tracking-widest p-0">Total Pembelian Telur</TableCell>
+                            <TableCell className="py-2 text-[10px] font-black text-blue-700 text-right tabular-nums p-0 pr-2">{formatMoney(eggPurchasesTotal, false)}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* ===== BEF AFKIR ===== */}
+                  {selectedEntity === 'BEF' && printAfkir.length > 0 && (
+                    <div>
+                      <h3 className="text-[9px] font-black text-slate-900 uppercase tracking-[0.15em] mb-3 border-b pb-1.5">
+                        Penjualan Ayam Afkir ({printAfkir.length} Transaksi)
+                      </h3>
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 w-8">No</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Tanggal</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Mitra</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Qty (Ekor)</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga/Ekor</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Total</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {printAfkir.map((t, i) => (
+                            <TableRow key={i} className="border-b border-slate-50 hover:bg-transparent">
+                              <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{i + 1}</TableCell>
+                              <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
+                              <TableCell className="py-1.5 text-[8px] font-black text-slate-900 uppercase p-0">{t.mitra_name || '-'}</TableCell>
+                              <TableCell className="py-1.5 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(t.qty_ekor || 0).toLocaleString('id-ID')}</TableCell>
+                              <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(t.harga_per_satuan || 0, false)}</TableCell>
+                              <TableCell className="py-1.5 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(t.total_harga || 0, false)}</TableCell>
+                            </TableRow>
+                          ))}
+                          <TableRow className="border-t-2 border-slate-900 hover:bg-transparent">
+                            <TableCell colSpan={5} className="py-2 text-[9px] font-black text-slate-900 uppercase tracking-widest p-0">Total Afkir</TableCell>
+                            <TableCell className="py-2 text-[10px] font-black text-emerald-700 text-right tabular-nums p-0 pr-2">{formatMoney(afkirTotal, false)}</TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+
+                  {/* ===== EMPTY STATE ===== */}
+                  {((selectedEntity === 'MBF' && printFeed.length === 0) || (selectedEntity === 'BEF' && printEgg.length === 0 && printAfkir.length === 0)) && (
+                    <EmptyState 
+                      icon={FileText} 
+                      title="Laporan Kosong" 
+                      description={`Tidak ada transaksi ${selectedEntity === 'MBF' ? 'pakan' : 'telur'} untuk periode ${periodLabel}.`}
+                    />
+                  )}
+
+                  {/* ===== SIGNATURE ===== */}
+                  <div className="grid grid-cols-2 gap-20 mt-6">
+                    <div className="flex flex-col items-center">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-14">Dibuat Oleh,</p>
+                      <div className="w-36 h-[1px] bg-slate-900 mb-1" />
+                      <p className="text-[9px] font-black uppercase tracking-tighter text-slate-900">Admin Keuangan</p>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-14">Mengetahui,</p>
+                      <div className="w-36 h-[1px] bg-slate-900 mb-1" />
+                      <p className="text-[9px] font-black uppercase tracking-tighter text-slate-900">
+                        {selectedEntity === 'MBF' ? 'Pimpinan PT MBF' : 'Pimpinan CV BEF'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Footer */}
+                  <div className="border-t-2 border-slate-100 pt-6 flex justify-between items-center opacity-50">
+                    <p className="text-[8px] font-bold italic text-slate-400">Dokumen ini merupakan laporan resmi yang dihasilkan secara otomatis oleh Sistem Admin MBF.</p>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-900">Halaman 1 / 1</p>
+                  </div>
                 </div>
               </div>
             </div>
 
+            {/* Print/Download Buttons */}
             <div className="flex gap-4 mt-12">
               <Button 
                   onClick={() => handlePrintLaporan()}
@@ -363,71 +923,13 @@ export function ExportView() {
                   Cetak Sekarang
               </Button>
               <Button 
-                  onClick={() => handlePrintLaporan()}
-                  variant="outline" 
-                  className="border-slate-300 text-slate-600 font-black text-xs uppercase tracking-widest rounded-lg h-12 px-8 bg-white gap-3 group"
+                  onClick={() => handleExportCSV()}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest rounded-lg h-12 px-8 shadow-xl shadow-emerald-500/20 gap-3"
                 >
-                  <Download size={18} className="group-hover:translate-y-0.5 transition-transform" />
-                  Download PDF
+                  <Download size={18} />
+                  Download CSV
               </Button>
             </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Exports Table */}
-      <Card className="border-slate-200/60 shadow-sm overflow-hidden">
-        <CardHeader className="bg-slate-50/50 border-b border-slate-100 px-8 py-5">
-          <CardTitle className="text-base font-black text-slate-800 uppercase tracking-tight">Riwayat Ekspor</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0 overflow-x-auto w-full min-w-0">
-          <Table>
-            <TableHeader className="bg-slate-50/30">
-              <TableRow className="border-slate-100">
-                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest py-4 pl-8">Nama Laporan</TableHead>
-                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest py-4">Periode</TableHead>
-                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest py-4">Diekspor Oleh</TableHead>
-                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest py-4">Tanggal</TableHead>
-                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest py-4">Format</TableHead>
-                <TableHead className="text-[10px] font-black text-slate-400 uppercase tracking-widest py-4 pr-8 text-center">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {RECENT_EXPORTS.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="p-0">
-                    <EmptyState 
-                      icon={FileText} 
-                      title="Belum Ada Riwayat" 
-                      description="Riwayat ekspor laporan akan muncul di sini setelah Anda melakukan ekspor data." 
-                    />
-                  </TableCell>
-                </TableRow>
-              ) : (
-                RECENT_EXPORTS.map((exp, i) => (
-                  <TableRow key={i} className="group hover:bg-slate-50 transition-colors border-slate-50">
-                    <TableCell className="py-4 pl-8 text-xs font-black text-slate-800 tracking-tight uppercase">{exp.name}</TableCell>
-                    <TableCell className="py-4 text-xs font-bold text-slate-500">{exp.period}</TableCell>
-                    <TableCell className="py-4 text-xs font-black text-slate-900 uppercase">{exp.user}</TableCell>
-                    <TableCell className="py-4 text-xs font-bold text-slate-400">{exp.date}</TableCell>
-                    <TableCell className="py-4">
-                        <Badge className={cn(
-                          "text-[9px] font-black uppercase px-2 py-0.5 rounded-lg border-none shadow-none",
-                          exp.format === 'PDF' ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600"
-                        )}>
-                          {exp.format}
-                        </Badge>
-                    </TableCell>
-                    <TableCell className="py-4 pr-8 text-center">
-                        <Button variant="ghost" size="sm" className="h-8 gap-2 text-[10px] font-black text-slate-400 hover:text-orange-600 uppercase tracking-widest group">
-                          <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
-                          Download
-                        </Button>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
         </CardContent>
       </Card>
     </SectionContainer>

@@ -125,7 +125,57 @@ export function BillingView() {
     if (!invoice) return;
     const code = generateInvoiceCode(invoice.id, invoice.created_at || invoice.tanggal, isTelur ? 'BEF' : 'MBF');
     const companyName = isTelur ? 'CV BERKAH EGG FARM' : 'PT. MITRA BAROKAH FARM';
-    const text = `Halo,\nBerikut kami sampaikan nota tagihan dari ${companyName} (Invoice: ${code}).\n\nUntuk detail transaksi selengkapnya, silakan lihat pada nota invoice yang dilampirkan bersama pesan ini.\n\nTerima kasih.`;
+    
+    // Format daftar belanjaan
+    let itemsText = "";
+    if (isTelur) {
+      const ket = invoice.keterangan || "";
+      const isGrouped = ket.includes('| JSON:');
+      if (isGrouped) {
+        try {
+          const jsonPart = ket.split('| JSON:')[1];
+          const items = JSON.parse(jsonPart);
+          itemsText = items.map((item: any) => {
+            const unit = (item.type === 'Telur Ayam Arab' || item.type === 'Telur Puyuh') ? 'btr' : 'kg';
+            const itemName = `${item.type}${item.grade ? ` - ${item.grade}` : ''}`;
+            return `- ${itemName} (${item.qty.toLocaleString('id-ID')} ${unit}): Rp${(item.qty * item.price).toLocaleString('id-ID')}`;
+          }).join('\n');
+        } catch (e) {}
+      }
+      if (!itemsText) {
+         let itemName = "Telur Ayam Horn";
+         if (ket.includes("Telur Ayam Horn")) itemName = "Telur Ayam Horn";
+         else if (ket.includes("Telur Ayam Arab")) itemName = "Telur Ayam Arab";
+         else {
+            const parts = ket.split('|');
+            const jenisPart = parts.find((p: string) => p.includes('Jenis:'));
+            if (jenisPart) itemName = jenisPart.replace('Jenis:', '').trim();
+         }
+         const unit = ket.toLowerCase().includes('arab') ? 'btr' : 'kg';
+         const qty = (invoice.jumlah_kg || invoice.total_kg || 0);
+         const total = invoice.total_harga || invoice.total_tagihan || 0;
+         itemsText = `- ${itemName} (${qty.toLocaleString('id-ID')} ${unit}): Rp${total.toLocaleString('id-ID')}`;
+      }
+    } else {
+      if (invoice.details && invoice.details.length > 0) {
+        itemsText = invoice.details.map((det: any) => {
+          const itemMaster = feedItems.find((fi: any) => String(fi.id) === String(det.id_bahan || det.bahan_id));
+          const itemName = itemMaster?.nama_bahan || det.nama_bahan || 'Pakan Ternak';
+          const itemSatuan = itemMaster?.satuan || det.satuan || 'kg';
+          const qty = det.qty || det.quantity || 0;
+          const price = det.harga_per_satuan || det.harga_satuan || 0;
+          return `- ${itemName} (${qty.toLocaleString('id-ID')} ${itemSatuan}): Rp${(qty * price).toLocaleString('id-ID')}`;
+        }).join('\n');
+      } else {
+         const total = invoice.total_tagihan || 0;
+         itemsText = `- Pakan Ternak Konsentrat (Bulk) (1 Unit): Rp${total.toLocaleString('id-ID')}`;
+      }
+    }
+
+    const total = invoice.total_tagihan || invoice.total_harga || 0;
+    const diff = total - getPaid(invoice);
+
+    const text = `Halo,\nBerikut kami sampaikan rincian tagihan dari ${companyName} (Invoice: ${code}).\n\n*Daftar Pesanan:*\n${itemsText}\n\n*Total Tagihan:* Rp${total.toLocaleString('id-ID')}\n*Sisa Piutang:* Rp${diff.toLocaleString('id-ID')}\n\nTerima kasih atas kerja samanya.`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };

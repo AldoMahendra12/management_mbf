@@ -14,8 +14,11 @@ import {
   Clock,
   ArrowUpRight,
   Bell,
+  Bell,
   Calendar,
-  Bird
+  Bird,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { SectionContainer } from '../layout/SectionContainer';
@@ -27,6 +30,7 @@ import { useDashboard } from '../../contexts/DashboardContext';
 export function DashboardView() {
   const [activityPage, setActivityPage] = useState(1);
   const [showNotifs, setShowNotifs] = useState(false);
+  const [stokSlideIndex, setStokSlideIndex] = useState(0);
   const { 
     dashboardStats, 
     eggReceivables, 
@@ -37,7 +41,8 @@ export function DashboardView() {
     recentCombinedActivities, 
     setActiveTab,
     formatMoney,
-    user
+    user,
+    eggStock
   } = useDashboard();
   
   // Compute top debtors (piutang)
@@ -319,33 +324,65 @@ export function DashboardView() {
           </div>
         </div>
 
-        {/* Card 3: Stok Telur */}
-        <div className="bg-white border border-slate-200/50 rounded-xl flex flex-col justify-between group cursor-pointer hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 shadow-sm transition-all duration-500 overflow-hidden" onClick={() => setActiveTab('Gudang Telur')}>
-          <div className="p-4 md:p-6 pb-4 md:pb-5">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Telur</p>
-            <h3 className="font-black text-slate-900 mt-3 tracking-tighter tabular-nums text-lg xl:text-xl flex items-baseline flex-wrap gap-x-1">
-              <span>{dashboardStats.stokTelur.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></span>
-              <span className="text-slate-300 font-light mx-0.5">/</span>
-              <span>{dashboardStats.stokTelurIkat?.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
-            </h3>
-            <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Tersedia di gudang</p>
-          </div>
-          <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-orange-500 bg-orange-500 transition-all duration-500">
-            <div className="relative z-10 text-[10px] font-black text-white uppercase tracking-widest flex h-4 overflow-hidden">
-              {"Lihat gudang".split('').map((char, i) => (
-                <span key={i} className="relative inline-block overflow-hidden">
-                  <span className="block transition-transform duration-500 group-hover:-translate-y-full" style={{ transitionDelay: `${i * 30}ms` }}>
-                    {char === ' ' ? '\u00A0' : char}
-                  </span>
-                  <span className="block absolute top-0 left-0 transition-transform duration-500 translate-y-full group-hover:translate-y-0" style={{ transitionDelay: `${i * 30}ms` }}>
-                    {char === ' ' ? '\u00A0' : char}
-                  </span>
-                </span>
-              ))}
+        {/* Card 3: Stok Telur Slider */}
+        {(() => {
+          const stokSlides = [
+            { id: 'merah', name: 'Merah (Horn)', qty: eggStock?.horn || 0, ikat: Math.floor((eggStock?.horn || 0) / 15), unit1: 'kg', unit2: 'ikat' },
+            { id: 'krem', name: 'Krem (Horn)', qty: eggStock?.krem || 0, ikat: Math.floor((eggStock?.krem || 0) / 15), unit1: 'kg', unit2: 'ikat' },
+            { id: 'arab', name: 'Arab', qty: eggStock?.arab || 0, ikat: Math.floor((eggStock?.arab || 0) / 300), unit1: 'btr', unit2: 'ikat' },
+            { id: 'puyuh', name: 'Puyuh', qty: eggStock?.puyuh || 0, ikat: Math.floor((eggStock?.puyuh || 0) / 10), unit1: 'btr', unit2: 'ikat' }
+          ];
+          const currentSlide = stokSlides[stokSlideIndex];
+          return (
+            <div className="bg-white border border-slate-200/50 rounded-xl flex flex-col justify-between group cursor-pointer hover:shadow-xl hover:shadow-slate-200/50 hover:-translate-y-1 shadow-sm transition-all duration-500 overflow-hidden relative" onClick={() => setActiveTab('Gudang Telur')}>
+              <div className="p-4 md:p-6 pb-4 md:pb-5 relative">
+                <div className="flex justify-between items-start">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Telur</p>
+                  <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                    <button 
+                      onClick={() => setStokSlideIndex((prev) => (prev - 1 + stokSlides.length) % stokSlides.length)}
+                      className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-orange-100 hover:text-orange-600 text-slate-400 transition-colors"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <button 
+                      onClick={() => setStokSlideIndex((prev) => (prev + 1) % stokSlides.length)}
+                      className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-orange-100 hover:text-orange-600 text-slate-400 transition-colors"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+                <h3 className="font-black text-slate-900 mt-1 tracking-tighter tabular-nums text-lg xl:text-xl flex items-baseline flex-wrap gap-x-1 transition-all">
+                  <span>{currentSlide.qty.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">{currentSlide.unit1}</span></span>
+                  <span className="text-slate-300 font-light mx-0.5">/</span>
+                  <span>{currentSlide.ikat.toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">{currentSlide.unit2}</span></span>
+                </h3>
+                <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">Tersedia: {currentSlide.name}</p>
+                <div className="absolute bottom-4 right-4 md:right-6 flex gap-1">
+                  {stokSlides.map((_, idx) => (
+                    <div key={idx} className={cn("h-1 rounded-full transition-all duration-300", stokSlideIndex === idx ? "w-3 bg-orange-500" : "w-1 bg-slate-200")} />
+                  ))}
+                </div>
+              </div>
+              <div className="relative overflow-hidden flex items-center justify-between px-6 py-4 border-t-2 border-orange-500 bg-orange-500 transition-all duration-500">
+                <div className="relative z-10 text-[10px] font-black text-white uppercase tracking-widest flex h-4 overflow-hidden">
+                  {"Lihat gudang".split('').map((char, i) => (
+                    <span key={i} className="relative inline-block overflow-hidden">
+                      <span className="block transition-transform duration-500 group-hover:-translate-y-full" style={{ transitionDelay: `${i * 30}ms` }}>
+                        {char === ' ' ? '\u00A0' : char}
+                      </span>
+                      <span className="block absolute top-0 left-0 transition-transform duration-500 translate-y-full group-hover:translate-y-0" style={{ transitionDelay: `${i * 30}ms` }}>
+                        {char === ' ' ? '\u00A0' : char}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <ArrowRight size={14} className="relative z-10 text-white group-hover:translate-x-1 transition-all duration-500" />
+              </div>
             </div>
-            <ArrowRight size={14} className="relative z-10 text-white group-hover:translate-x-1 transition-all duration-500" />
-          </div>
-        </div>
+          );
+        })()}
 
         {/* Card 4: Stok Pakan Kritis */}
         <div className={cn(

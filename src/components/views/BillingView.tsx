@@ -123,9 +123,9 @@ export function BillingView() {
 
   const handleKirimWA = (invoice: any, isTelur: boolean) => {
     if (!invoice) return;
-    const diff = (invoice.total_tagihan || invoice.total_harga || 0) - getPaid(invoice);
     const code = generateInvoiceCode(invoice.id, invoice.created_at || invoice.tanggal, isTelur ? 'BEF' : 'MBF');
-    const text = `Halo,\nBerikut adalah detail tagihan dari ${isTelur ? 'CV BERKAH EGG FARM' : 'PT. MITRA BAROKAH FARM'}:\nNo. Invoice: ${code}\nTanggal: ${new Date(invoice.created_at || Date.now()).toLocaleDateString('id-ID')}\n\nTotal Tagihan: Rp${(invoice.total_tagihan || invoice.total_harga || 0).toLocaleString('id-ID')}\nSisa Piutang: Rp${diff.toLocaleString('id-ID')}\n\nTerima kasih.`;
+    const companyName = isTelur ? 'CV BERKAH EGG FARM' : 'PT. MITRA BAROKAH FARM';
+    const text = `Halo,\nBerikut kami sampaikan nota tagihan dari ${companyName} (Invoice: ${code}).\n\nUntuk detail transaksi selengkapnya, silakan lihat pada nota invoice yang dilampirkan bersama pesan ini.\n\nTerima kasih.`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };

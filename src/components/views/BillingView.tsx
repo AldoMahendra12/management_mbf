@@ -175,7 +175,7 @@ export function BillingView() {
     const total = invoice.total_tagihan || invoice.total_harga || 0;
     const diff = total - getPaid(invoice);
 
-    const text = `Halo,\nBerikut kami sampaikan rincian tagihan dari ${companyName} (Invoice: ${code}).\n\n*Daftar Pesanan:*\n${itemsText}\n\n*Total Tagihan:* Rp${total.toLocaleString('id-ID')}\n*Sisa Piutang:* Rp${diff.toLocaleString('id-ID')}\n\nTerima kasih atas kerja samanya.`;
+    const text = `Halo,\nBerikut kami sampaikan rincian tagihan dari ${companyName} (Invoice: ${code}).\n\n*Daftar Pesanan:*\n${itemsText}\n\n*Total Tagihan:* Rp${diff.toLocaleString('id-ID')}\n\nTerima kasih atas kerja samanya.`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };

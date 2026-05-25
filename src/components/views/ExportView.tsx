@@ -176,7 +176,7 @@ export function ExportView() {
     } else {
       // Flatten egg transactions with item details from JSON
       const rows: string[][] = [];
-      rows.push(['No', 'No. Invoice', 'Tanggal', 'Jenis', 'Pelanggan/Mitra', 'Jenis Telur', 'Grade', 'Qty (kg)', 'Ikat', 'Harga/kg', 'Subtotal', 'Total Harga', 'Sudah Dibayar', 'Sisa', 'Status']);
+      rows.push(['No', 'No. Invoice', 'Tanggal', 'Jenis', 'Pelanggan/Mitra', 'Jenis Telur', 'Grade', 'Qty (Kg/Btr)', 'Ikat', 'Harga Satuan', 'Subtotal', 'Total Harga', 'Sudah Dibayar', 'Sisa', 'Status']);
 
       let no = 0;
       const sorted = [...filteredEgg].sort((a, b) => new Date(a.tanggal).getTime() - new Date(b.tanggal).getTime());
@@ -195,7 +195,9 @@ export function ExportView() {
         if (items.length > 0) {
           items.forEach((item, idx) => {
             const qty = item.qty || 0;
-            const ikatVal = qty > 0 && qty % 15 === 0 ? String(qty / 15) : '-';
+            const isArab = item.type === 'Telur Ayam Arab';
+            const divisor = isArab ? 300 : 15;
+            const ikatVal = qty > 0 && qty % divisor === 0 ? String(qty / divisor) : '-';
             rows.push([
               idx === 0 ? String(no) : '',
               idx === 0 ? inv : '',
@@ -709,9 +711,9 @@ export function ExportView() {
                               <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Tgl</TableHead>
                               <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Pelanggan</TableHead>
                               <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Jenis & Grade</TableHead>
-                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Kg</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Qty</TableHead>
                               <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Ikat</TableHead>
-                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga/kg</TableHead>
+                              <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga</TableHead>
                               <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Subtotal</TableHead>
                             </TableRow>
                           </TableHeader>
@@ -729,7 +731,7 @@ export function ExportView() {
                                     <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
                                     <TableCell className="py-1.5 text-[8px] font-black text-slate-900 uppercase p-0">{mitra}</TableCell>
                                     <TableCell className="py-1.5 text-[8px] text-slate-400 italic p-0">Telur Ayam</TableCell>
-                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(t.jumlah_kg || 0).toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="py-1.5 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(t.jumlah_kg || 0).toLocaleString('id-ID')} kg</TableCell>
                                     <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 text-right tabular-nums p-0">{(t.jumlah_kg || 0) % 15 === 0 && t.jumlah_kg > 0 ? (t.jumlah_kg / 15) : '-'}</TableCell>
                                     <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(t.harga_per_kg || 0, false)}</TableCell>
                                     <TableCell className="py-1.5 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(t.total_harga || 0, false)}</TableCell>
@@ -739,7 +741,10 @@ export function ExportView() {
 
                               return items.map((item, iIdx) => {
                                 const qty = item.qty || 0;
-                                const ikatStr = qty > 0 && qty % 15 === 0 ? String(qty / 15) : '-';
+                                const isArab = item.type === 'Telur Ayam Arab';
+                                const divisor = isArab ? 300 : 15;
+                                const unitLabel = isArab ? 'btr' : 'kg';
+                                const ikatStr = qty > 0 && qty % divisor === 0 ? String(qty / divisor) : '-';
                                 return (
                                   <TableRow key={`${tIdx}-${iIdx}`} className={cn(
                                     "hover:bg-transparent",
@@ -750,7 +755,7 @@ export function ExportView() {
                                     <TableCell className="py-1 text-[8px] font-bold text-slate-500 p-0">{iIdx === 0 ? new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' }) : ''}</TableCell>
                                     <TableCell className="py-1 text-[8px] font-black text-slate-900 uppercase p-0">{iIdx === 0 ? mitra : ''}</TableCell>
                                     <TableCell className="py-1 text-[8px] font-bold text-slate-700 p-0">{item.type}{item.grade ? ` - ${item.grade}` : ''}</TableCell>
-                                    <TableCell className="py-1 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{qty.toLocaleString('id-ID')}</TableCell>
+                                    <TableCell className="py-1 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{qty.toLocaleString('id-ID')} {unitLabel}</TableCell>
                                     <TableCell className="py-1 text-[8px] font-bold text-slate-400 text-right tabular-nums p-0">{ikatStr}</TableCell>
                                     <TableCell className="py-1 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(item.price || 0, false)}</TableCell>
                                     <TableCell className="py-1 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(qty * (item.price || 0), false)}</TableCell>
@@ -784,9 +789,9 @@ export function ExportView() {
                             <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Tgl</TableHead>
                             <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Supplier</TableHead>
                             <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0">Jenis & Grade</TableHead>
-                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Kg</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Qty</TableHead>
                             <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Ikat</TableHead>
-                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga/kg</TableHead>
+                            <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right">Harga</TableHead>
                             <TableHead className="h-7 text-[8px] font-black uppercase text-slate-400 p-0 text-right pr-2">Subtotal</TableHead>
                           </TableRow>
                         </TableHeader>
@@ -804,7 +809,7 @@ export function ExportView() {
                                   <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
                                   <TableCell className="py-1.5 text-[8px] font-black text-slate-900 uppercase p-0">{mitra}</TableCell>
                                   <TableCell className="py-1.5 text-[8px] text-slate-400 italic p-0">Telur Ayam</TableCell>
-                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(t.jumlah_kg || 0).toLocaleString('id-ID')}</TableCell>
+                                  <TableCell className="py-1.5 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{(t.jumlah_kg || 0).toLocaleString('id-ID')} kg</TableCell>
                                   <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 text-right tabular-nums p-0">{(t.jumlah_kg || 0) % 15 === 0 && t.jumlah_kg > 0 ? (t.jumlah_kg / 15) : '-'}</TableCell>
                                   <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(t.harga_per_kg || 0, false)}</TableCell>
                                   <TableCell className="py-1.5 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(t.total_harga || 0, false)}</TableCell>
@@ -814,7 +819,10 @@ export function ExportView() {
 
                             return items.map((item, iIdx) => {
                               const qty = item.qty || 0;
-                              const ikatStr = qty > 0 && qty % 15 === 0 ? String(qty / 15) : '-';
+                              const isArab = item.type === 'Telur Ayam Arab';
+                              const divisor = isArab ? 300 : 15;
+                              const unitLabel = isArab ? 'btr' : 'kg';
+                              const ikatStr = qty > 0 && qty % divisor === 0 ? String(qty / divisor) : '-';
                               return (
                                 <TableRow key={`${tIdx}-${iIdx}`} className={cn(
                                   "hover:bg-transparent",
@@ -825,7 +833,7 @@ export function ExportView() {
                                   <TableCell className="py-1 text-[8px] font-bold text-slate-500 p-0">{iIdx === 0 ? new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' }) : ''}</TableCell>
                                   <TableCell className="py-1 text-[8px] font-black text-slate-900 uppercase p-0">{iIdx === 0 ? mitra : ''}</TableCell>
                                   <TableCell className="py-1 text-[8px] font-bold text-slate-700 p-0">{item.type}{item.grade ? ` - ${item.grade}` : ''}</TableCell>
-                                  <TableCell className="py-1 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{qty.toLocaleString('id-ID')}</TableCell>
+                                  <TableCell className="py-1 text-[8px] font-bold text-slate-700 text-right tabular-nums p-0">{qty.toLocaleString('id-ID')} {unitLabel}</TableCell>
                                   <TableCell className="py-1 text-[8px] font-bold text-slate-400 text-right tabular-nums p-0">{ikatStr}</TableCell>
                                   <TableCell className="py-1 text-[8px] font-bold text-slate-500 text-right tabular-nums p-0">{formatMoney(item.price || 0, false)}</TableCell>
                                   <TableCell className="py-1 text-[8px] font-black text-slate-900 text-right tabular-nums p-0 pr-2">{formatMoney(qty * (item.price || 0), false)}</TableCell>

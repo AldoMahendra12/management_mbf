@@ -151,7 +151,7 @@ export function Sidebar({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto overflow-x-visible">
+        <nav className="flex-1 px-3 py-3 space-y-1 overflow-y-auto overflow-x-visible scrollbar-hide">
           {menuItems.map((item) => (
             <button
               key={item.id}

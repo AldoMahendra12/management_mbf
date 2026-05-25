@@ -177,16 +177,31 @@ export function EggWarehouseView() {
           { label: 'Total Beli Telur', val: <>{totalMasukEgg.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></>, sub: 'Total telur diterima dari kandang' },
           { label: 'Total Jual Telur', val: <>{totalKeluarEgg.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></>, sub: 'Total telur terjual ke mitra' },
           { label: 'Stok Gudang Telur', val: <>
-            <span>{((eggStock?.horn || 0) + (eggStock?.arab || 0) + (eggStock?.puyuh || 0)).toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></span>
-            <span className="text-slate-300 font-light mx-1">/</span>
-            <span>{(Math.floor((eggStock?.horn || 0) / 15) + Math.floor((eggStock?.arab || 0) / 300) + Math.floor((eggStock?.puyuh || 0) / 10)).toLocaleString('id-ID')} <span className="text-xs text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
-          </>, sub: 'Sisa stok telur di gudang' },
+            <div className="flex flex-col w-full text-xs font-bold text-slate-700 mt-1">
+              <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                <span>Merah <span className="text-[9px] text-slate-400 font-normal ml-1">(Horn)</span></span>
+                <span>{(eggStock?.horn || 0).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span><span className="text-slate-300 font-light mx-1">/</span>{Math.floor((eggStock?.horn || 0) / 15).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                <span>Krem <span className="text-[9px] text-slate-400 font-normal ml-1">(Horn)</span></span>
+                <span>{(eggStock?.krem || 0).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span><span className="text-slate-300 font-light mx-1">/</span>{Math.floor((eggStock?.krem || 0) / 15).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b border-slate-100">
+                <span>Arab</span>
+                <span>{(eggStock?.arab || 0).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">btr</span><span className="text-slate-300 font-light mx-1">/</span>{Math.floor((eggStock?.arab || 0) / 300).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
+              </div>
+              <div className="flex justify-between items-center py-1">
+                <span>Puyuh</span>
+                <span>{(eggStock?.puyuh || 0).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">btr</span><span className="text-slate-300 font-light mx-1">/</span>{Math.floor((eggStock?.puyuh || 0) / 10).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
+              </div>
+            </div>
+          </>, sub: '' },
         ].map((card, i) => (
-          <div key={i} className="card-premium p-4 md:p-6 flex flex-col justify-between h-auto md:h-[140px] min-w-0">
+          <div key={i} className={cn("card-premium p-4 md:p-6 flex flex-col justify-between min-w-0 h-full", i !== 2 ? "h-auto md:h-[140px]" : "")}>
              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.label}</p>
              <div>
-               <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tighter tabular-nums flex items-baseline flex-wrap gap-x-1">{card.val}</h3>
-               <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">{card.sub}</p>
+               <h3 className={cn("text-lg md:text-xl font-black text-slate-900 tracking-tighter tabular-nums flex items-baseline flex-wrap gap-x-1", i === 2 ? "w-full text-base md:text-lg" : "")}>{card.val}</h3>
+               {card.sub && <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">{card.sub}</p>}
              </div>
           </div>
         ))}

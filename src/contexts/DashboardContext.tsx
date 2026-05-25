@@ -348,24 +348,50 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     return effectiveEggTransactions.reduce((acc, curr) => {
       const isArab = curr.keterangan?.includes('Jenis: Telur Ayam Arab');
       const isPuyuh = curr.keterangan?.includes('Jenis: Telur Puyuh');
-      const isHorn = !isArab && !isPuyuh;
+      let isKrem = false;
+      let isHornMerah = false;
       
       const amount = Number(curr.jumlah_kg) || 0;
       const type = (curr.jenis_transaksi || '').toLowerCase();
       const isAdd = type.includes('terima') || type.includes('beli') || type.includes('setoran') || type.includes('stok awal');
       const isSub = type.includes('jual') || type.includes('keluar');
 
+      if (curr.keterangan?.includes('| JSON:')) {
+        try {
+          const items = JSON.parse(curr.keterangan.split('| JSON:')[1]);
+          items.forEach((item: any) => {
+            const qty = Number(item.qty) || 0;
+            if (item.type === 'Telur Ayam Arab') {
+              if (isAdd) acc.arab += qty;
+              else if (isSub) acc.arab -= qty;
+            } else if (item.type === 'Telur Puyuh') {
+              if (isAdd) acc.puyuh += qty;
+              else if (isSub) acc.puyuh -= qty;
+            } else if (item.type === 'Telur Ayam Horn' && item.grade === 'Krem') {
+              if (isAdd) acc.krem += qty;
+              else if (isSub) acc.krem -= qty;
+            } else {
+              if (isAdd) acc.horn += qty;
+              else if (isSub) acc.horn -= qty;
+            }
+          });
+          return acc;
+        } catch (e) {}
+      }
+
+      isHornMerah = !isArab && !isPuyuh;
+
       if (isAdd) {
-        if (isHorn) acc.horn += amount;
+        if (isHornMerah) acc.horn += amount;
         else if (isArab) acc.arab += amount;
         else if (isPuyuh) acc.puyuh += amount;
       } else if (isSub) {
-        if (isHorn) acc.horn -= amount;
+        if (isHornMerah) acc.horn -= amount;
         else if (isArab) acc.arab -= amount;
         else if (isPuyuh) acc.puyuh -= amount;
       }
       return acc;
-    }, { horn: 0, arab: 0, puyuh: 0 });
+    }, { horn: 0, krem: 0, arab: 0, puyuh: 0 });
   }, [effectiveEggTransactions]);
 
   const effectiveFeedItems = useMemo(() => {

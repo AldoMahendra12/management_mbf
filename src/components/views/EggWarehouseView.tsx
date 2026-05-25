@@ -12,7 +12,9 @@ import {
   MessageSquare,
   DollarSign,
   Trash2,
-  History
+  History,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,6 +64,7 @@ export function EggWarehouseView() {
   } = useDashboard();
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [stokSlideIndex, setStokSlideIndex] = useState(0);
   const pageSize = 8;
 
   const uniqueEggMonths = Array.from(new Set(eggTransactions.map(t => t.tanggal?.substring(0, 7)))).filter(Boolean).sort().reverse();
@@ -175,36 +178,63 @@ export function EggWarehouseView() {
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
         {[
           { label: 'Total Beli Telur', val: <>{totalMasukEgg.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></>, sub: 'Total telur diterima dari kandang' },
-          { label: 'Total Jual Telur', val: <>{totalKeluarEgg.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></>, sub: 'Total telur terjual ke mitra' },
-          { label: 'Stok Gudang Telur', val: <>
-            <div className="flex flex-col w-full text-xs font-bold text-slate-700 mt-1">
-              <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                <span>Merah <span className="text-[9px] text-slate-400 font-normal ml-1">(Horn)</span></span>
-                <span>{(eggStock?.horn || 0).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span><span className="text-slate-300 font-light mx-1">/</span>{Math.floor((eggStock?.horn || 0) / 15).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                <span>Krem <span className="text-[9px] text-slate-400 font-normal ml-1">(Horn)</span></span>
-                <span>{(eggStock?.krem || 0).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span><span className="text-slate-300 font-light mx-1">/</span>{Math.floor((eggStock?.krem || 0) / 15).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
-              </div>
-              <div className="flex justify-between items-center py-1 border-b border-slate-100">
-                <span>Arab</span>
-                <span>{(eggStock?.arab || 0).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">btr</span><span className="text-slate-300 font-light mx-1">/</span>{Math.floor((eggStock?.arab || 0) / 300).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
-              </div>
-              <div className="flex justify-between items-center py-1">
-                <span>Puyuh</span>
-                <span>{(eggStock?.puyuh || 0).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">btr</span><span className="text-slate-300 font-light mx-1">/</span>{Math.floor((eggStock?.puyuh || 0) / 10).toLocaleString('id-ID')} <span className="text-[9px] text-slate-400 font-black tracking-widest uppercase ml-0.5">ikat</span></span>
-              </div>
-            </div>
-          </>, sub: '' },
+          { label: 'Total Jual Telur', val: <>{totalKeluarEgg.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">kg</span></>, sub: 'Total telur terjual ke mitra' }
         ].map((card, i) => (
-          <div key={i} className={cn("card-premium p-4 md:p-6 flex flex-col justify-between min-w-0 h-full", i !== 2 ? "h-auto md:h-[140px]" : "")}>
+          <div key={i} className="card-premium p-4 md:p-6 flex flex-col justify-between h-auto md:h-[140px] min-w-0">
              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{card.label}</p>
              <div>
-               <h3 className={cn("text-lg md:text-xl font-black text-slate-900 tracking-tighter tabular-nums flex items-baseline flex-wrap gap-x-1", i === 2 ? "w-full text-base md:text-lg" : "")}>{card.val}</h3>
+               <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tighter tabular-nums flex items-baseline flex-wrap gap-x-1">{card.val}</h3>
                {card.sub && <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">{card.sub}</p>}
              </div>
           </div>
         ))}
+        
+        {/* Stok Gudang Telur Slider Card */}
+        {(() => {
+          const stokSlides = [
+            { id: 'merah', name: 'Merah', desc: '(Horn)', qty: eggStock?.horn || 0, ikat: Math.floor((eggStock?.horn || 0) / 15), unit1: 'kg', unit2: 'ikat' },
+            { id: 'krem', name: 'Krem', desc: '(Horn)', qty: eggStock?.krem || 0, ikat: Math.floor((eggStock?.krem || 0) / 15), unit1: 'kg', unit2: 'ikat' },
+            { id: 'arab', name: 'Arab', desc: '', qty: eggStock?.arab || 0, ikat: Math.floor((eggStock?.arab || 0) / 300), unit1: 'btr', unit2: 'ikat' },
+            { id: 'puyuh', name: 'Puyuh', desc: '', qty: eggStock?.puyuh || 0, ikat: Math.floor((eggStock?.puyuh || 0) / 10), unit1: 'btr', unit2: 'ikat' }
+          ];
+          const currentSlide = stokSlides[stokSlideIndex];
+          return (
+            <div className="card-premium p-4 md:p-6 flex flex-col justify-between h-auto md:h-[140px] min-w-0 group relative overflow-hidden">
+               <div className="flex justify-between items-start">
+                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Stok Gudang Telur</p>
+                 <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                   <button 
+                     onClick={() => setStokSlideIndex((prev) => (prev - 1 + stokSlides.length) % stokSlides.length)}
+                     className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-orange-100 hover:text-orange-600 text-slate-400 transition-colors"
+                   >
+                     <ChevronLeft size={14} />
+                   </button>
+                   <button 
+                     onClick={() => setStokSlideIndex((prev) => (prev + 1) % stokSlides.length)}
+                     className="w-6 h-6 flex items-center justify-center rounded-full bg-slate-100 hover:bg-orange-100 hover:text-orange-600 text-slate-400 transition-colors"
+                   >
+                     <ChevronRight size={14} />
+                   </button>
+                 </div>
+               </div>
+               <div>
+                 <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tighter tabular-nums flex items-baseline flex-wrap gap-x-1 transition-all">
+                   {currentSlide.qty.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">{currentSlide.unit1}</span>
+                   <span className="text-slate-300 font-light mx-1">/</span>
+                   {currentSlide.ikat.toLocaleString('id-ID')} <span className="text-sm text-slate-400 font-black tracking-widest uppercase ml-0.5">{currentSlide.unit2}</span>
+                 </h3>
+                 <p className="text-[9px] font-bold text-slate-400 mt-2 uppercase tracking-widest opacity-70">
+                   Stok {currentSlide.name} {currentSlide.desc}
+                 </p>
+               </div>
+               <div className="absolute bottom-3 right-4 md:right-6 flex gap-1">
+                 {stokSlides.map((_, idx) => (
+                   <div key={idx} className={cn("h-1 rounded-full transition-all duration-300", stokSlideIndex === idx ? "w-3 bg-orange-500" : "w-1 bg-slate-200")} />
+                 ))}
+               </div>
+            </div>
+          );
+        })()}
       </div>
 
       <div className="card-premium overflow-hidden border border-slate-200/60 shadow-sm flex flex-col min-w-0">

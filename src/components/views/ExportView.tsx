@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils';
 import { generateInvoiceCode } from '@/lib/invoice-utils';
 import logoMBF from '../../assets/logo_MBF.png';
 import logoBEF from '../../assets/logo_BEF.png';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 import { useDashboard } from '../../contexts/DashboardContext';
 
@@ -123,9 +125,9 @@ export function ExportView() {
   const printRefLaporan = useRef<HTMLDivElement>(null);
   const handlePrintLaporan = useReactToPrint({ contentRef: printRefLaporan });
 
-  // --- CSV EXPORT ---
-  const handleExportCSV = () => {
-    const monthLabel = new Date(selectedMonth + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+  // --- PDF EXPORT ---
+  const handleExportPDF = () => {
+    const periodLabel = new Date(selectedMonth + '-01').toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
 
     if (selectedEntity === 'MBF') {
       // Flatten feed transactions with item details
@@ -172,7 +174,7 @@ export function ExportView() {
         }
       });
 
-      downloadCSV(rows, `Laporan_PT_MBF_${selectedMonth}.csv`);
+      downloadPDF(rows, `Laporan_PT_MBF_${selectedMonth}.pdf`, 'MBF');
     } else {
       // Flatten egg transactions with item details from JSON
       const rows: string[][] = [];
@@ -241,19 +243,35 @@ export function ExportView() {
         });
       }
 
-      downloadCSV(rows, `Laporan_CV_BEF_${selectedMonth}.csv`);
+      downloadPDF(rows, `Laporan_CV_BEF_${selectedMonth}.pdf`, 'BEF');
     }
-    showToast(`Berhasil mengunduh laporan CSV`);
+    showToast(`Berhasil mengunduh laporan PDF`);
   };
 
-  function downloadCSV(rows: string[][], filename: string) {
-    const BOM = '\uFEFF';
-    const csvContent = BOM + rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = filename;
-    link.click();
+  function downloadPDF(rows: string[][], filename: string, entity: 'MBF' | 'BEF') {
+    const doc = new jsPDF('landscape');
+    const title = entity === 'MBF' ? 'Laporan Keuangan PT MBF' : 'Laporan Keuangan CV BEF';
+    doc.text(title, 14, 15);
+    doc.setFontSize(10);
+    doc.text(`Periode: ${periodLabel}`, 14, 22);
+
+    const head = rows[0];
+    const body = rows.slice(1).filter(r => r.length > 0).map(r => {
+      const padded = [...r];
+      while (padded.length < head.length) padded.push('');
+      return padded;
+    });
+
+    autoTable(doc, {
+      startY: 25,
+      head: [head],
+      body: body,
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 1 },
+      headStyles: { fillColor: [15, 23, 42] }
+    });
+
+    doc.save(filename);
   }
 
   // --- PERIOD LABEL ---
@@ -359,12 +377,12 @@ export function ExportView() {
                     <Button 
                       onClick={() => {
                         setSelectedEntity(card.entity);
-                        handleExportCSV();
+                        handleExportPDF();
                       }}
                       className="h-11 text-[9px] font-black uppercase tracking-widest rounded-xl shadow-lg transition-all active:scale-95 bg-emerald-600 text-white shadow-emerald-600/10"
                     >
-                      <FileSpreadsheet size={14} className="mr-1.5" />
-                      EXCEL CSV
+                      <Download size={14} className="mr-1.5" />
+                      DOWNLOAD PDF
                     </Button>
                     <Button 
                       onClick={() => {
@@ -931,11 +949,11 @@ export function ExportView() {
                   Cetak Sekarang
               </Button>
               <Button 
-                  onClick={() => handleExportCSV()}
+                  onClick={() => handleExportPDF()}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-widest rounded-lg h-12 px-8 shadow-xl shadow-emerald-500/20 gap-3"
                 >
                   <Download size={18} />
-                  Download CSV
+                  Download PDF
               </Button>
             </div>
         </CardContent>

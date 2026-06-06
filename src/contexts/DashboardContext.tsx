@@ -170,6 +170,7 @@ interface DashboardContextType {
   // Utility
   formatMoney: (amount: number, short?: boolean) => string;
   handleOCRFeedResult: (data: any) => void;
+  handleOCREggResult: (data: any) => void;
 }
 
 const DashboardContext = createContext<DashboardContextType | undefined>(undefined);
@@ -642,10 +643,60 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   }, [mitraName, feedCart, feedModalType, feedDate, feedCartTotal, feedItems, fetchFeedTransactions, fetchFeedMaster, showToast, supabase, isSandbox]);
 
 
+  // --- Fuzzy matching helper for feed items ---
+  const matchFeedItem = useCallback((ocrName: string) => {
+    const name = ocrName.toLowerCase().trim();
+    if (!name) return null;
+
+    // Keyword alias map: maps common OCR words to DB name keywords
+    const ALIAS: Record<string, string[]> = {
+      'jagung': ['jagung', 'corn'],
+      'katul': ['katul', 'bekatul', 'bran'],
+      'bekatul': ['katul', 'bekatul'],
+      'super 36 spr': ['super 36 spr', '36 spr', 'spr'],
+      'super 36': ['super 36'],
+      'kik s 36 spr': ['super 36 spr', 'spr'],
+      'klk super 36': ['super 36'],
+      'par s': ['par s', 'pars'],
+      'par g': ['par g', 'parg'],
+      'par doc': ['par doc', 'pardoc', 'doc'],
+      'mineral': ['mineral'],
+      'sams quin': ['sams quin', 'samquin', 'quin'],
+      'mix sams': ['mix sams', 'mixsams'],
+      '758-3': ['758-3', '7583'],
+      '758-2': ['758-2', '7582'],
+    };
+
+    // 1. Try exact match first
+    const exact = feedItems.find(f => f.nama_bahan.toLowerCase().trim() === name);
+    if (exact) return exact;
+
+    // 2. Try alias lookup
+    for (const [key, aliases] of Object.entries(ALIAS)) {
+      if (name.includes(key) || aliases.some(a => name.includes(a))) {
+        const found = feedItems.find(f => 
+          aliases.some(a => f.nama_bahan.toLowerCase().includes(a))
+        );
+        if (found) return found;
+      }
+    }
+
+    // 3. Try token overlap (at least 1 meaningful token matches)
+    const tokens = name.split(/\s+/).filter(t => t.length > 2);
+    const scored = feedItems.map(f => {
+      const dbTokens = f.nama_bahan.toLowerCase().split(/\s+/);
+      const overlap = tokens.filter(t => dbTokens.some((dt: string) => dt.includes(t) || t.includes(dt))).length;
+      return { item: f, score: overlap };
+    });
+    const best = scored.sort((a, b) => b.score - a.score)[0];
+    if (best && best.score > 0) return best.item;
+
+    return null;
+  }, [feedItems]);
+
   const handleOCRFeedResult = useCallback((data: any) => {
     if (data.nama_mitra) setMitraName(data.nama_mitra);
     if (data.tanggal) {
-      // Ensure date format is YYYY-MM-DD
       try {
         const d = new Date(data.tanggal);
         if (!isNaN(d.getTime())) {
@@ -655,14 +706,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     }
     if (data.items && data.items.length > 0) {
       const newCart = data.items.map((item: any) => {
-        // ✅ Tambah fallback || '' agar tidak crash jika undefined
         const ocrName = (item.name || item.nama_bahan || '').toLowerCase().trim();
-
-        const matched = feedItems.find(f => {
-          const dbName = (f.nama_bahan || '').toLowerCase().trim();
-          return dbName !== '' && (dbName.includes(ocrName) || ocrName.includes(dbName));
-        });
-
+        const matched = matchFeedItem(ocrName);
         return {
           id_bahan: matched ? String(matched.id) : '',
           qty: item.qty || 0,
@@ -671,7 +716,42 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       });
       setFeedCart(newCart);
     }
-  }, [feedItems]);
+  }, [feedItems, matchFeedItem]);
+
+  // OCR handler for Egg transactions
+  const handleOCREggResult = useCallback((data: any) => {
+    if (data.nama_mitra) setMitraName(data.nama_mitra);
+    if (data.tanggal) {
+      try {
+        const d = new Date(data.tanggal);
+        if (!isNaN(d.getTime())) {
+          setEggDate(d.toISOString().split('T')[0]);
+        }
+      } catch (e) {}
+    }
+    // Map egg type from OCR result
+    const mapType = (name: string): { type: string; grade: string } => {
+      const n = (name || '').toLowerCase();
+      if (n.includes('arab')) return { type: 'Telur Ayam Arab', grade: '' };
+      if (n.includes('puyuh')) return { type: 'Telur Puyuh', grade: '' };
+      if (n.includes('krem') || n.includes('cream')) return { type: 'Telur Ayam Horn', grade: 'Krem' };
+      if (n.includes('merah') || n.includes('red')) return { type: 'Telur Ayam Horn', grade: 'Merah' };
+      return { type: 'Telur Ayam Horn', grade: 'Merah' };
+    };
+    if (data.items && data.items.length > 0) {
+      const newCart = data.items.map((item: any) => {
+        const { type, grade } = mapType(item.name || '');
+        const qty = item.qty || 0;
+        const isArab = type === 'Telur Ayam Arab';
+        const ikat = (!isArab && type !== 'Telur Puyuh') ? Math.round(qty / 15) : 0;
+        return { type, grade, ikat, qty, price: item.price || 0, notes: '', inputMode: 'kg' };
+      });
+      setEggCart(newCart);
+    } else if (data.jumlah_kg) {
+      // Fallback: single item from jumlah_kg
+      setEggCart([{ type: 'Telur Ayam Horn', grade: 'Merah', ikat: Math.round(data.jumlah_kg / 15), qty: data.jumlah_kg, price: data.harga_per_kg || 0, notes: '', inputMode: 'kg' }]);
+    }
+  }, []);
 
   const handleSubmitAfkir = useCallback(async () => {
     if (afkirQty <= 0 || !afkirMitra) {
@@ -1211,6 +1291,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
     fetchAfkirTransactions,
     formatMoney,
     handleOCRFeedResult,
+    handleOCREggResult,
     setNotification,
     confirmModal,
     setConfirmModal,

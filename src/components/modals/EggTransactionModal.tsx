@@ -23,7 +23,8 @@ export const EggTransactionModal: React.FC = () => {
     isSubmittingEggs,
     handleSubmitEgg,
     eggStock,
-    showAlert
+    showAlert,
+    handleOCREggResult
   } = useDashboard();
 
   if (!eggModalType) return null;
@@ -85,6 +86,12 @@ export const EggTransactionModal: React.FC = () => {
         <div className="flex-1 overflow-y-auto px-8 py-8 custom-scrollbar space-y-8">
           {step === 1 ? (
             <>
+              {/* AI OCR Scan */}
+              <OCRUpload
+                type="egg"
+                onSuccess={handleOCREggResult}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-2">

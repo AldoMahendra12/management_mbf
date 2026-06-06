@@ -47,12 +47,17 @@ export async function extractDataFromReceipt(
     'image/jpeg'; // default fallback
 
   const prompt = type === 'egg'
-    ? `Kamu adalah OCR struk transaksi telur. Ekstrak:
-       - tanggal (format YYYY-MM-DD, konversi dari format apapun)
-       - nama_mitra (nama toko/perusahaan supplier di bagian atas nota)
-       - jumlah_kg (angka saja)
-       - harga_per_kg (angka saja tanpa titik/koma)
-       Balas HANYA JSON, tanpa markdown.`
+    ? `Kamu adalah OCR struk/nota transaksi telur ayam. Ekstrak data berikut dari gambar nota:
+       - tanggal: konversi ke format YYYY-MM-DD (jika tidak ada, gunakan hari ini)
+       - nama_mitra: nama toko, peternakan, atau supplier (biasanya di atas nota)
+       - items: array berisi semua jenis telur dalam nota, masing-masing:
+           - name: jenis telur. Gunakan salah satu: "Telur Ayam Horn - Merah", "Telur Ayam Horn - Krem", "Telur Ayam Arab", "Telur Puyuh"
+           - qty: jumlah dalam KG (untuk telur horn/krem), atau BUTIR (untuk arab/puyuh)
+           - price: harga per kg atau per butir (angka saja, tanpa titik/koma). Jika tidak ada isi 0.
+       Jika hanya ada 1 jenis telur di nota, tetap gunakan format items array.
+       Jika nota tidak menyebut jenis telur secara eksplisit, asumsikan "Telur Ayam Horn - Merah".
+       Balas HANYA JSON valid tanpa markdown. Contoh:
+       {"tanggal":"2026-06-01","nama_mitra":"Peternakan Pak Budi","items":[{"name":"Telur Ayam Horn - Merah","qty":450,"price":22500},{"name":"Telur Ayam Horn - Krem","qty":60,"price":19000}]}`
     : `Kamu adalah OCR untuk nota/surat jalan pembelian pakan ternak.
        Ekstrak data berikut dari gambar:
        - tanggal: konversi ke format YYYY-MM-DD (contoh: "14/04/2026" → "2026-04-14")

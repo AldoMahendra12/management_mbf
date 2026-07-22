@@ -125,6 +125,18 @@ export function BillingView() {
     if (!invoice) return;
     const code = generateInvoiceCode(invoice.id, invoice.created_at || invoice.tanggal, isTelur ? 'BEF' : 'MBF');
     const companyName = isTelur ? 'CV BERKAH EGG FARM' : 'PT. MITRA BAROKAH FARM';
+
+    const rawDate = invoice.tanggal || invoice.created_at;
+    let formattedDate = "";
+    if (rawDate) {
+      const d = new Date(rawDate);
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        formattedDate = `${day}/${month}/${year}`;
+      }
+    }
     
     // Format daftar belanjaan
     let itemsText = "";
@@ -136,9 +148,26 @@ export function BillingView() {
           const jsonPart = ket.split('| JSON:')[1];
           const items = JSON.parse(jsonPart);
           itemsText = items.map((item: any) => {
-            const unit = (item.type === 'Telur Ayam Arab' || item.type === 'Telur Puyuh') ? 'btr' : 'kg';
+            const isArab = item.type === 'Telur Ayam Arab';
+            const isPuyuh = item.type === 'Telur Puyuh';
+            const isHorn = item.type === 'Telur Ayam Horn' || (!isArab && !isPuyuh);
             const itemName = `${item.type}${item.grade ? ` - ${item.grade}` : ''}`;
-            return `- ${itemName} (${item.qty.toLocaleString('id-ID')} ${unit}): Rp${(item.qty * item.price).toLocaleString('id-ID')}`;
+            const qty = Number(item.qty || 0);
+            const price = Number(item.price || 0);
+            const totalItemPrice = qty * price;
+
+            if (isHorn) {
+              const ikat = Number(item.ikat) || (qty ? Math.round(qty / 15) : 0);
+              if (ikat > 0) {
+                return `- ${itemName}: ${ikat.toLocaleString('id-ID')} ikat x 15 kg x Rp${price.toLocaleString('id-ID')} = Rp${totalItemPrice.toLocaleString('id-ID')}`;
+              } else {
+                return `- ${itemName}: ${qty.toLocaleString('id-ID')} kg x Rp${price.toLocaleString('id-ID')} = Rp${totalItemPrice.toLocaleString('id-ID')}`;
+              }
+            } else if (isArab || isPuyuh) {
+              return `- ${itemName}: ${qty.toLocaleString('id-ID')} btr x Rp${price.toLocaleString('id-ID')} = Rp${totalItemPrice.toLocaleString('id-ID')}`;
+            } else {
+              return `- ${itemName}: ${qty.toLocaleString('id-ID')} kg x Rp${price.toLocaleString('id-ID')} = Rp${totalItemPrice.toLocaleString('id-ID')}`;
+            }
           }).join('\n');
         } catch (e) {}
       }
@@ -146,15 +175,30 @@ export function BillingView() {
          let itemName = "Telur Ayam Horn";
          if (ket.includes("Telur Ayam Horn")) itemName = "Telur Ayam Horn";
          else if (ket.includes("Telur Ayam Arab")) itemName = "Telur Ayam Arab";
+         else if (ket.includes("Telur Puyuh")) itemName = "Telur Puyuh";
          else {
             const parts = ket.split('|');
             const jenisPart = parts.find((p: string) => p.includes('Jenis:'));
             if (jenisPart) itemName = jenisPart.replace('Jenis:', '').trim();
          }
-         const unit = ket.toLowerCase().includes('arab') ? 'btr' : 'kg';
-         const qty = (invoice.jumlah_kg || invoice.total_kg || 0);
-         const total = invoice.total_harga || invoice.total_tagihan || 0;
-         itemsText = `- ${itemName} (${qty.toLocaleString('id-ID')} ${unit}): Rp${total.toLocaleString('id-ID')}`;
+         const isArab = ket.toLowerCase().includes('arab');
+         const isPuyuh = ket.toLowerCase().includes('puyuh');
+         const isHorn = !isArab && !isPuyuh;
+         const qty = Number(invoice.jumlah_kg || invoice.total_kg || 0);
+         const total = Number(invoice.total_harga || invoice.total_tagihan || 0);
+         const price = invoice.harga_per_kg || (qty > 0 ? Math.round(total / qty) : 0);
+
+         if (isHorn && qty > 0) {
+            const ikat = Math.round(qty / 15);
+            if (ikat > 0) {
+              itemsText = `- ${itemName}: ${ikat.toLocaleString('id-ID')} ikat x 15 kg x Rp${Math.round(price).toLocaleString('id-ID')} = Rp${total.toLocaleString('id-ID')}`;
+            } else {
+              itemsText = `- ${itemName}: ${qty.toLocaleString('id-ID')} kg x Rp${Math.round(price).toLocaleString('id-ID')} = Rp${total.toLocaleString('id-ID')}`;
+            }
+         } else {
+            const unit = (isArab || isPuyuh) ? 'btr' : 'kg';
+            itemsText = `- ${itemName}: ${qty.toLocaleString('id-ID')} ${unit} x Rp${Math.round(price).toLocaleString('id-ID')} = Rp${total.toLocaleString('id-ID')}`;
+         }
       }
     } else {
       if (invoice.details && invoice.details.length > 0) {
@@ -162,20 +206,22 @@ export function BillingView() {
           const itemMaster = feedItems.find((fi: any) => String(fi.id) === String(det.id_bahan || det.bahan_id));
           const itemName = itemMaster?.nama_bahan || det.nama_bahan || 'Pakan Ternak';
           const itemSatuan = itemMaster?.satuan || det.satuan || 'kg';
-          const qty = det.qty || det.quantity || 0;
-          const price = det.harga_per_satuan || det.harga_satuan || 0;
-          return `- ${itemName} (${qty.toLocaleString('id-ID')} ${itemSatuan}): Rp${(qty * price).toLocaleString('id-ID')}`;
+          const qty = Number(det.qty || det.quantity || 0);
+          const price = Number(det.harga_per_satuan || det.harga_satuan || 0);
+          const totalItemPrice = qty * price;
+          return `- ${itemName}: ${qty.toLocaleString('id-ID')} ${itemSatuan} x Rp${price.toLocaleString('id-ID')} = Rp${totalItemPrice.toLocaleString('id-ID')}`;
         }).join('\n');
       } else {
-         const total = invoice.total_tagihan || 0;
-         itemsText = `- Pakan Ternak Konsentrat (Bulk) (1 Unit): Rp${total.toLocaleString('id-ID')}`;
+         const total = Number(invoice.total_tagihan || 0);
+         itemsText = `- Pakan Ternak Konsentrat (Bulk): Rp${total.toLocaleString('id-ID')}`;
       }
     }
 
-    const total = invoice.total_tagihan || invoice.total_harga || 0;
+    const total = Number(invoice.total_tagihan || invoice.total_harga || 0);
     const diff = total - getPaid(invoice);
 
-    const text = `Halo,\nBerikut kami sampaikan rincian tagihan dari ${companyName} (Invoice: ${code}).\n\n*Daftar Pesanan:*\n${itemsText}\n\n*Total Tagihan:* Rp${diff.toLocaleString('id-ID')}\n\nTerima kasih atas kerja samanya.`;
+    const dateLine = formattedDate ? `\n*Tanggal Pembelian:* ${formattedDate}` : '';
+    const text = `Halo,\nBerikut kami sampaikan rincian tagihan dari ${companyName} (Invoice: ${code}).${dateLine}\n\n*Daftar Pesanan:*\n${itemsText}\n\n*Total Tagihan:* Rp${diff.toLocaleString('id-ID')}\n\nTerima kasih atas kerja samanya.`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };

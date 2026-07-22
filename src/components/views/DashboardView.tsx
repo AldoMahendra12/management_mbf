@@ -14,7 +14,6 @@ import {
   Clock,
   ArrowUpRight,
   Bell,
-  Bell,
   Calendar,
   Bird,
   ChevronLeft,

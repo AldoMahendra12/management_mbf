@@ -469,20 +469,40 @@ export function FeedWarehouseView() {
             >
               Prev
             </Button>
-            {Array.from({ length: Math.max(1, totalPages) }).map((_, i) => (
-              <Button
-                key={i}
-                variant={currentPage === i + 1 ? "default" : "outline"}
-                size="sm"
-                onClick={() => setCurrentPage(i + 1)}
-                className={cn(
-                  "h-8 w-8 p-0 rounded-lg text-[9px] font-black",
-                  currentPage === i + 1 ? "bg-orange-500 hover:bg-orange-600 border-orange-500 text-white" : ""
-                )}
-              >
-                {i + 1}
-              </Button>
-            ))}
+            {(() => {
+              const total = Math.max(1, totalPages);
+              const getVisiblePages = (current: number, totalPages: number) => {
+                if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+                if (current <= 4) return [1, 2, 3, 4, 5, '...', totalPages];
+                if (current >= totalPages - 3) return [1, '...', totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+                return [1, '...', current - 1, current, current + 1, '...', totalPages];
+              };
+              
+              return getVisiblePages(currentPage, total).map((page, idx) => {
+                if (page === '...') {
+                  return (
+                    <div key={`ellipsis-${idx}`} className="flex items-end justify-center px-1">
+                      <span className="text-slate-400 font-bold tracking-widest text-[10px]">...</span>
+                    </div>
+                  );
+                }
+                
+                return (
+                  <Button
+                    key={`page-${page}`}
+                    variant={currentPage === page ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(page as number)}
+                    className={cn(
+                      "h-8 w-8 p-0 rounded-lg text-[9px] font-black",
+                      currentPage === page ? "bg-orange-500 hover:bg-orange-600 border-orange-500 text-white" : ""
+                    )}
+                  >
+                    {page}
+                  </Button>
+                );
+              });
+            })()}
             <Button
               variant="outline"
               size="sm"

@@ -42,6 +42,19 @@ function getFeedMitra(t: any): string {
   return (t.nama_mitra || t.keterangan?.replace('Mitra: ', '')?.split('|')[0]?.trim() || 'Umum').trim();
 }
 
+
+// Helper: pagination nav component
+const PrevNextNav = ({ page, totalPages, onPrev, onNext }: { page: number; totalPages: number; onPrev: () => void; onNext: () => void }) => {
+  if (totalPages <= 1) return null;
+  return (
+    <div className="flex justify-center items-center gap-3 mt-3 print:hidden">
+      <Button variant="outline" size="sm" onClick={onPrev} disabled={page === 1} className="px-3 h-7 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500">◀ Prev</Button>
+      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hal {page} / {totalPages}</span>
+      <Button variant="outline" size="sm" onClick={onNext} disabled={page === totalPages} className="px-3 h-7 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500">Next ▶</Button>
+    </div>
+  );
+};
+
 export function ExportView() {
   const { eggTransactions, feedTransactions, afkirTransactions, feedItems, formatMoney, showToast } = useDashboard();
   
@@ -140,16 +153,6 @@ export function ExportView() {
   const feedPurchasesTotalPages = Math.max(1, Math.ceil(feedPurchases.length / PAGE_SIZE));
   const eggSalesTotalPages = Math.max(1, Math.ceil(eggSales.length / PAGE_SIZE));
   const eggPurchasesTotalPages = Math.max(1, Math.ceil(eggPurchases.length / PAGE_SIZE));
-
-  // Helper: pagination nav component
-  const PrevNextNav = ({ page, totalPages, onPrev, onNext }: { page: number; totalPages: number; onPrev: () => void; onNext: () => void }) =>
-    totalPages > 1 ? (
-      <div className="flex justify-center items-center gap-3 mt-3 print:hidden">
-        <Button variant="outline" size="sm" onClick={onPrev} disabled={page === 1} className="px-3 h-7 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500">◀ Prev</Button>
-        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hal {page} / {totalPages}</span>
-        <Button variant="outline" size="sm" onClick={onNext} disabled={page === totalPages} className="px-3 h-7 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500">Next ▶</Button>
-      </div>
-    ) : null;
 
   // --- PRINT ---
   const printRefLaporan = useRef<HTMLDivElement>(null);

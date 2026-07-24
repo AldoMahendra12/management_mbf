@@ -22,13 +22,20 @@ import logoMBF from '../../assets/logo_MBF.png';
 
 import { useDashboard } from '../../contexts/DashboardContext';
 
-const printStyles = `
+const buildPrintStyles = (orientation: string, margin: string, scale: number) => `
   @media print {
-    @page { size: landscape; margin: 0; }
-    body { -webkit-print-color-adjust: exact; }
+    @page { size: ${orientation}; margin: ${margin}; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .print-hide { display: none !important; }
+    .invoice-print-layout {
+      transform: scale(${scale / 100}) !important;
+      transform-origin: top center !important;
+    }
   }
 `;
+// legacy alias used by <style> tag in JSX
+const printStyles = buildPrintStyles('landscape', '0', 100);
+
 
 export function BillingView() {
   const {
@@ -96,6 +103,29 @@ export function BillingView() {
   const [agingFilter, setAgingFilter] = useState<'all' | 'lancar' | 'perhatian' | 'macet'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'Semua' | 'Belum Lunas' | 'Lunas'>('Semua');
+  const [currentPageTelur, setCurrentPageTelur] = useState(1);
+  const [currentPagePakan, setCurrentPagePakan] = useState(1);
+  
+  // Reset pagination when mode/filter changes
+  useEffect(() => { setCurrentPageTelur(1); setCurrentPagePakan(1); }, [billingMode, billingSubMode, agingFilter, statusFilter, searchQuery]);
+
+  // Print settings
+  const [printOrientation, setPrintOrientation] = useState<'landscape' | 'portrait'>('landscape');
+  const [printMargin, setPrintMargin] = useState('0');
+  const [printScale, setPrintScale] = useState(100);
+  const [showPrintSettings, setShowPrintSettings] = useState(false);
+
+  const applyPrintAndPrint = (handler: () => void) => {
+    const styleId = 'dynamic-print-style';
+    let el = document.getElementById(styleId) as HTMLStyleElement | null;
+    if (!el) {
+      el = document.createElement('style');
+      el.id = styleId;
+      document.head.appendChild(el);
+    }
+    el.innerHTML = buildPrintStyles(printOrientation, printMargin, printScale);
+    setTimeout(() => handler(), 60);
+  };
 
   // Helper: resolves the paid amount for both egg (jumlah_dibayar) and feed (dibayar_hari_ini) schemas
   const getPaid = (row: any) => {
@@ -113,6 +143,138 @@ export function BillingView() {
     if (d < 7) return 'lancar';
     if (d < 30) return 'perhatian';
     return 'macet';
+  };
+
+  const pageSize = 8;
+
+  const filteredEggList = React.useMemo(() => {
+    let list = (billingSubMode === 'piutang' ? eggReceivables : eggPayables) || [];
+    
+    if (billingSubMode === 'piutang' && agingFilter !== 'all') {
+      list = list.filter((t: any) => getAgingCat(t.created_at || t.tanggal) === agingFilter);
+    }
+
+    if (statusFilter !== 'Semua') {
+      list = list.filter((row: any) => {
+        const diff = (row.total_harga || 0) - (row.jumlah_dibayar || 0);
+        const status = diff === 0 ? 'Lunas' : 'Belum Lunas';
+        return status === statusFilter;
+      });
+    }
+
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((row: any) => {
+        const customer = (row.keterangan || '').toLowerCase();
+        const invCode = generateInvoiceCode(row.id, row.created_at || row.tanggal, 'BEF').toLowerCase();
+        return customer.includes(q) || invCode.includes(q);
+      });
+    }
+
+    return list;
+  }, [billingSubMode, eggReceivables, eggPayables, agingFilter, statusFilter, searchQuery]);
+
+  const totalPagesTelur = Math.max(1, Math.ceil(filteredEggList.length / pageSize));
+  const paginatedEggList = React.useMemo(() => {
+    return filteredEggList.slice((currentPageTelur - 1) * pageSize, currentPageTelur * pageSize);
+  }, [filteredEggList, currentPageTelur, pageSize]);
+
+  const filteredFeedList = React.useMemo(() => {
+    let list = (billingSubMode === "piutang" ? groupedFeedRecv : feedPayables) || [];
+    if (billingSubMode === 'piutang' && agingFilter !== 'all') {
+      list = list.filter((t: any) => getAgingCat(t.created_at || t.tanggal) === agingFilter);
+    }
+    if (statusFilter !== 'Semua') {
+      list = list.filter((row: any) => {
+        const total = Number(row.total_tagihan) || 0;
+        const paid = Number(getPaid(row)) || 0;
+        const diff = total - paid;
+        return (diff <= 0 ? 'Lunas' : 'Belum Lunas') === statusFilter;
+      });
+    }
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter((row: any) => {
+        const name = (row.nama_mitra || '').toLowerCase();
+        const ket = (row.keterangan || '').toLowerCase();
+        const invCode = generateInvoiceCode(row.id, row.created_at || row.tanggal, 'MBF').toLowerCase();
+        return name.includes(q) || ket.includes(q) || invCode.includes(q);
+      });
+    }
+    return list;
+  }, [billingSubMode, groupedFeedRecv, feedPayables, agingFilter, statusFilter, searchQuery]);
+
+  const totalPagesPakan = Math.max(1, Math.ceil(filteredFeedList.length / pageSize));
+  const paginatedFeedList = React.useMemo(() => {
+    return filteredFeedList.slice((currentPagePakan - 1) * pageSize, currentPagePakan * pageSize);
+  }, [filteredFeedList, currentPagePakan, pageSize]);
+
+  const renderPaginationFooter = (
+    currentPage: number, 
+    totalPages: number, 
+    totalItems: number, 
+    onPageChange: (page: number) => void
+  ) => {
+    if (totalItems === 0) return null;
+    const getVisiblePages = (current: number, totalPagesCount: number) => {
+      if (totalPagesCount <= 7) return Array.from({ length: totalPagesCount }, (_, i) => i + 1);
+      if (current <= 4) return [1, 2, 3, 4, 5, '...', totalPagesCount];
+      if (current >= totalPagesCount - 3) return [1, '...', totalPagesCount - 4, totalPagesCount - 3, totalPagesCount - 2, totalPagesCount - 1, totalPagesCount];
+      return [1, '...', current - 1, current, current + 1, '...', totalPagesCount];
+    };
+
+    return (
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-6 py-4 border-t border-slate-100 bg-slate-50/30">
+        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest text-center sm:text-left">
+          Halaman {currentPage} dari {totalPages} (Total {totalItems} invoice)
+        </p>
+        <div className="flex gap-2 items-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(Math.max(1, currentPage - 1))}
+            disabled={currentPage === 1}
+            className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest border-slate-200 text-slate-600 hover:text-slate-900"
+          >
+            Prev
+          </Button>
+          {getVisiblePages(currentPage, totalPages).map((page, idx) => {
+            if (page === '...') {
+              return (
+                <div key={`ellipsis-${idx}`} className="flex items-end justify-center px-1">
+                  <span className="text-slate-400 font-bold tracking-widest text-[10px]">...</span>
+                </div>
+              );
+            }
+            return (
+              <Button
+                key={`page-${page}`}
+                variant={currentPage === page ? "default" : "outline"}
+                size="sm"
+                onClick={() => onPageChange(page as number)}
+                className={cn(
+                  "h-8 w-8 p-0 rounded-lg text-[9px] font-black",
+                  currentPage === page 
+                    ? "bg-orange-500 hover:bg-orange-600 border-orange-500 text-white" 
+                    : "border-slate-200 text-slate-600 hover:text-slate-900"
+                )}
+              >
+                {page}
+              </Button>
+            );
+          })}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(Math.min(totalPages, currentPage + 1))}
+            disabled={currentPage === totalPages || totalPages === 0}
+            className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest border-slate-200 text-slate-600 hover:text-slate-900"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
+    );
   };
   
   const printRefTelur = useRef<HTMLDivElement>(null);
@@ -343,185 +505,161 @@ export function BillingView() {
             })()}
 
             <div className="grid grid-cols-12 gap-6 items-start">
-              <Card className="col-span-12 border-slate-200/60 shadow-sm overflow-hidden min-h-[600px]">
-                <CardHeader className="bg-slate-50/50 border-b border-slate-200 flex flex-col gap-4">
-                  <CardTitle className="text-base font-black text-slate-900 uppercase tracking-tight">Invoice & Piutang Telur</CardTitle>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl">
-                      {['Semua', 'Belum Lunas', 'Lunas'].map((s: any) => (
-                        <button 
-                          key={s} 
-                          onClick={() => setStatusFilter(s as any)}
-                          className={cn(
-                            "px-3 py-1 rounded-md text-[9px] font-black transition-all uppercase tracking-widest", 
-                            statusFilter === s ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-black hover:text-slate-700"
-                          )}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex gap-2 p-1 bg-slate-50 rounded-xl border border-slate-200">
-                        <button 
-                          onClick={() => setBillingSubMode('piutang')}
-                          className={cn("px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all", billingSubMode === 'piutang' ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-slate-600 hover:text-slate-900")}
-                        >
-                          Piutang (Diterima)
-                        </button>
-                        <button 
-                          onClick={() => setBillingSubMode('hutang')}
-                          className={cn("px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all", billingSubMode === 'hutang' ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-slate-600 hover:text-slate-900")}
-                        >
-                          Hutang (Dibayar)
-                        </button>
+              <Card className="col-span-12 border-slate-200/60 shadow-sm overflow-hidden min-h-[600px] flex flex-col justify-between">
+                <div>
+                  <CardHeader className="bg-slate-50/50 border-b border-slate-200 flex flex-col gap-4">
+                    <CardTitle className="text-base font-black text-slate-900 uppercase tracking-tight">Invoice & Piutang Telur</CardTitle>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl">
+                        {['Semua', 'Belum Lunas', 'Lunas'].map((s: any) => (
+                          <button 
+                            key={s} 
+                            onClick={() => setStatusFilter(s as any)}
+                            className={cn(
+                              "px-3 py-1 rounded-md text-[9px] font-black transition-all uppercase tracking-widest", 
+                              statusFilter === s ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-black hover:text-slate-700"
+                            )}
+                          >
+                            {s}
+                          </button>
+                        ))}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Filter size={14} className="text-slate-300" />
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                          <input 
-                            type="text" 
-                            placeholder="Cari invoice..." 
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="bg-white border border-slate-200 rounded-lg py-1.5 pl-9 pr-3 text-xs font-bold w-48 outline-none focus:border-orange-200" 
-                          />
+                      <div className="flex items-center gap-4">
+                        <div className="flex gap-2 p-1 bg-slate-50 rounded-xl border border-slate-200">
+                          <button 
+                            onClick={() => setBillingSubMode('piutang')}
+                            className={cn("px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all", billingSubMode === 'piutang' ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-slate-600 hover:text-slate-900")}
+                          >
+                            Piutang (Diterima)
+                          </button>
+                          <button 
+                            onClick={() => setBillingSubMode('hutang')}
+                            className={cn("px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all", billingSubMode === 'hutang' ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-slate-600 hover:text-slate-900")}
+                          >
+                            Hutang (Dibayar)
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Filter size={14} className="text-slate-300" />
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                            <input 
+                              type="text" 
+                              placeholder="Cari invoice..." 
+                              value={searchQuery}
+                              onChange={(e) => setSearchQuery(e.target.value)}
+                              className="bg-white border border-slate-200 rounded-lg py-1.5 pl-9 pr-3 text-xs font-bold w-48 outline-none focus:border-orange-200" 
+                            />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0 overflow-x-auto w-full min-w-0">
-                  <Table>
-                    <TableHeader className="bg-slate-50/30">
-                      <TableRow className="border-slate-100">
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-6">Invoice</TableHead>
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Customer</TableHead>
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sisa</TableHead>
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</TableHead>
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest pr-6 text-center">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(() => {
-                        let list = (billingSubMode === 'piutang' ? eggReceivables : eggPayables) || [];
-                        
-                        if (billingSubMode === 'piutang' && agingFilter !== 'all') {
-                          list = list.filter((t: any) => getAgingCat(t.created_at || t.tanggal) === agingFilter);
-                        }
-
-                        if (statusFilter !== 'Semua') {
-                          list = list.filter((row: any) => {
+                  </CardHeader>
+                  <CardContent className="p-0 overflow-x-auto w-full min-w-0">
+                    <Table>
+                      <TableHeader className="bg-slate-50/30">
+                        <TableRow className="border-slate-100">
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-6">Invoice</TableHead>
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Customer</TableHead>
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sisa</TableHead>
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</TableHead>
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest pr-6 text-center">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredEggList.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5}>
+                              <EmptyState 
+                                icon={FileText} 
+                                title="Invoice Tidak Ditemukan" 
+                                description="Tidak ada catatan tagihan telur yang sesuai dengan filter saat ini." 
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          paginatedEggList.map((row: any, i: number) => {
                             const diff = (row.total_harga || 0) - (row.jumlah_dibayar || 0);
-                            const status = diff === 0 ? 'Lunas' : 'Belum Lunas';
-                            return status === statusFilter;
-                          });
-                        }
+                            const status = diff === 0 ? 'Lunas' : row.jumlah_dibayar > 0 ? 'Sebagian' : 'Belum Bayar';
+                            const customer = (row.keterangan || '').split('|')[0]?.replace('Mitra: ', '').trim() || '-';
 
-                        if (searchQuery) {
-                          const q = searchQuery.toLowerCase();
-                          list = list.filter((row: any) => {
-                            const customer = (row.keterangan || '').toLowerCase();
-                            const invCode = generateInvoiceCode(row.id, row.created_at || row.tanggal, 'BEF').toLowerCase();
-                            return customer.includes(q) || invCode.includes(q);
-                          });
-                        }
-
-                        if (list.length === 0) {
-                          return (
-                            <TableRow>
-                              <TableCell colSpan={5}>
-                                <EmptyState 
-                                  icon={FileText} 
-                                  title="Invoice Tidak Ditemukan" 
-                                  description="Tidak ada catatan tagihan telur yang sesuai dengan filter saat ini." 
-                                />
-                              </TableCell>
-                            </TableRow>
-                          );
-                        }
-
-                        return list.map((row: any, i: number) => {
-                          const diff = (row.total_harga || 0) - (row.jumlah_dibayar || 0);
-                          const status = diff === 0 ? 'Lunas' : row.jumlah_dibayar > 0 ? 'Sebagian' : 'Belum Bayar';
-                          const customer = (row.keterangan || '').split('|')[0]?.replace('Mitra: ', '').trim() || '-';
-
-                          return (
-                            <TableRow key={row.id || i} className="group border-slate-50 hover:bg-slate-50 transition-colors">
-                               <TableCell className="pl-6 py-4">
-                                  <div className="flex flex-col">
-                                    <span className="text-xs font-black text-slate-900 tracking-tight uppercase">
-                                      {generateInvoiceCode(row.id, row.created_at || row.tanggal, 'BEF')}
-                                    </span>
-                                    <span className="text-[9px] font-bold text-slate-400 mt-0.5">
-                                      {new Date(row.tanggal || Date.now()).toLocaleDateString('id-ID')}
-                                    </span>
-                                  </div>
-                               </TableCell>
-                               <TableCell className="text-xs font-black text-slate-700 uppercase">{customer}</TableCell>
-                               <TableCell className="text-xs font-black text-slate-900">{formatMoney(diff)}</TableCell>
-                               <TableCell className="text-left">
-                                  <Badge className={cn(
-                                    "text-[8px] font-black uppercase border-none px-2 py-0.5",
-                                    status === 'Lunas' ? "bg-green-100 text-green-600" :
-                                    status === 'Sebagian' ? "bg-orange-100 text-orange-500" :
-                                    "bg-red-100 text-red-600"
-                                  )}>
-                                    {status}
-                                  </Badge>
-                               </TableCell>
-                               <TableCell className="pr-6 text-center flex items-center justify-center gap-2">
-                                  {billingSubMode === 'piutang' && (
+                            return (
+                              <TableRow key={row.id || i} className="group border-slate-50 hover:bg-slate-50 transition-colors">
+                                 <TableCell className="pl-6 py-4">
+                                    <div className="flex flex-col">
+                                      <span className="text-xs font-black text-slate-900 tracking-tight uppercase">
+                                        {generateInvoiceCode(row.id, row.created_at || row.tanggal, 'BEF')}
+                                      </span>
+                                      <span className="text-[9px] font-bold text-slate-400 mt-0.5">
+                                        {new Date(row.tanggal || Date.now()).toLocaleDateString('id-ID')}
+                                      </span>
+                                    </div>
+                                 </TableCell>
+                                 <TableCell className="text-xs font-black text-slate-700 uppercase">{customer}</TableCell>
+                                 <TableCell className="text-xs font-black text-slate-900">{formatMoney(diff)}</TableCell>
+                                 <TableCell className="text-left">
+                                    <Badge className={cn(
+                                      "text-[8px] font-black uppercase border-none px-2 py-0.5",
+                                      status === 'Lunas' ? "bg-green-100 text-green-600" :
+                                      status === 'Sebagian' ? "bg-orange-100 text-orange-500" :
+                                      "bg-red-100 text-red-600"
+                                    )}>
+                                      {status}
+                                    </Badge>
+                                 </TableCell>
+                                 <TableCell className="pr-6 text-center flex items-center justify-center gap-2">
+                                    {billingSubMode === 'piutang' && (
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setExpandedInvoice(expandedInvoice === row.id ? null : row.id);
+                                        }}
+                                        className={cn(
+                                          "h-8 w-8 p-0 rounded-lg transition-all border-none",
+                                          expandedInvoice === row.id ? "bg-orange-100 text-orange-500" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                                        )}
+                                      >
+                                        <FileText size={14} />
+                                      </Button>
+                                    )}
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedInvoice(row);
+                                        setInvoiceModalMode('bayar');
+                                        fetchPaymentHistory(row.id);
+                                      }}
+                                      className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest bg-orange-500 hover:bg-orange-600 text-white border-none shadow-sm shadow-orange-500/20"
+                                    >
+                                      Bayar
+                                    </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setExpandedInvoice(expandedInvoice === row.id ? null : row.id);
+                                        setSelectedEggDetail(row);
+                                        setIsEggDetailOpen(true);
+                                        fetchPaymentHistory(row.id);
                                       }}
-                                      className={cn(
-                                        "h-8 w-8 p-0 rounded-lg transition-all border-none",
-                                        expandedInvoice === row.id ? "bg-orange-100 text-orange-500" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
-                                      )}
+                                      className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:bg-orange-50"
                                     >
-                                      <FileText size={14} />
+                                      Detail
                                     </Button>
-                                  )}
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedInvoice(row);
-                                      setInvoiceModalMode('bayar');
-                                      fetchPaymentHistory(row.id);
-                                    }}
-                                    className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest bg-orange-500 hover:bg-orange-600 text-white border-none shadow-sm shadow-orange-500/20"
-                                  >
-                                    Bayar
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedEggDetail(row);
-                                      setIsEggDetailOpen(true);
-                                      fetchPaymentHistory(row.id);
-                                    }}
-                                    className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:bg-orange-50"
-                                  >
-                                    Detail
-                                  </Button>
-                                </TableCell>
-                            </TableRow>
-                          );
-                        });
-                      })()}
-                    </TableBody>
-                  </Table>
-                </CardContent>
+                                  </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </div>
+                {renderPaginationFooter(currentPageTelur, totalPagesTelur, filteredEggList.length, setCurrentPageTelur)}
               </Card>
             </div>
 
@@ -541,7 +679,7 @@ export function BillingView() {
                     return (
                       <div className="flex flex-col gap-4">
                          <div ref={printRefTelur} className="print:m-0 print:p-0 flex justify-center print:block">
-                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in]">
+                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout">
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
                                   <img src={logoBEF} alt="" className="w-[60%] h-auto object-contain" />
                                </div>
@@ -658,15 +796,68 @@ export function BillingView() {
                               </div>
                            </div>
                          </div>
-
+                          {/* Print Settings Panel */}
+                          <div className="mx-auto w-full max-w-[9.5in] flex flex-col items-center gap-3">
+                            <button
+                              onClick={() => setShowPrintSettings(v => !v)}
+                              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-orange-500 transition-colors"
+                            >
+                              <Printer size={12} />
+                              {showPrintSettings ? 'Sembunyikan Pengaturan Cetak ▲' : 'Pengaturan Cetak ▼'}
+                            </button>
+                            {showPrintSettings && (
+                              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-wrap gap-6 items-end w-full max-w-xl">
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Orientasi</label>
+                                  <select
+                                    value={printOrientation}
+                                    onChange={e => setPrintOrientation(e.target.value as any)}
+                                    className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 bg-white outline-none focus:border-orange-300"
+                                  >
+                                    <option value="landscape">Landscape (Horizontal)</option>
+                                    <option value="portrait">Portrait (Vertikal)</option>
+                                  </select>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Margin</label>
+                                  <select
+                                    value={printMargin}
+                                    onChange={e => setPrintMargin(e.target.value)}
+                                    className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 bg-white outline-none focus:border-orange-300"
+                                  >
+                                    <option value="0">Tanpa Margin</option>
+                                    <option value="5mm">Kecil (5mm)</option>
+                                    <option value="10mm">Normal (10mm)</option>
+                                    <option value="15mm">Besar (15mm)</option>
+                                    <option value="20mm">Sangat Besar (20mm)</option>
+                                  </select>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Skala: {printScale}%</label>
+                                  <input
+                                    type="range"
+                                    min={50}
+                                    max={100}
+                                    step={5}
+                                    value={printScale}
+                                    onChange={e => setPrintScale(Number(e.target.value))}
+                                    className="w-36 accent-orange-500"
+                                  />
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-bold italic leading-tight">
+                                  💡 Nota terpotong? Kurangi Skala<br/>atau ganti Margin ke "Tanpa Margin"
+                                </p>
+                              </div>
+                            )}
+                          </div>
                          <div className="flex gap-2 justify-center">
-                            <Button onClick={() => handlePrintTelur()} className="w-64 btn-primary h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest">
-                               <Printer size={16} /> Cetak Invoice
-                            </Button>
-                            <Button onClick={() => handleKirimWA(activeInvoice, true)} variant="outline" className="w-64 h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 bg-slate-100 hover:bg-slate-200 border-none">
-                               <MessageCircle size={16} className="text-green-600" /> WA Invoice
-                            </Button>
-                         </div>
+                             <Button onClick={() => applyPrintAndPrint(handlePrintTelur)} className="w-64 btn-primary h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest">
+                                <Printer size={16} /> Cetak Invoice
+                             </Button>
+                             <Button onClick={() => handleKirimWA(activeInvoice, true)} variant="outline" className="w-64 h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 bg-slate-100 hover:bg-slate-200 border-none">
+                                <MessageCircle size={16} className="text-green-600" /> WA Invoice
+                             </Button>
+                          </div>
                       </div>
                     );
                  })()}
@@ -742,139 +933,119 @@ export function BillingView() {
             })()}
 
             <div className="grid grid-cols-12 gap-6 items-start">
-              <Card className="col-span-12 border-slate-200/60 shadow-sm overflow-hidden min-h-[600px]">
-                <CardHeader className="bg-slate-50/50 border-b border-slate-200 flex flex-col gap-4">
-                  <CardTitle className="text-base font-black text-slate-900 uppercase tracking-tight">Invoice & Piutang Pakan (PT MBF)</CardTitle>
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl">
-                      {['Semua', 'Belum Lunas', 'Lunas'].map((s: any) => (
-                        <button 
-                          key={s} 
-                          onClick={() => setStatusFilter(s as any)}
-                          className={cn(
-                            "px-3 py-1 rounded-md text-[9px] font-black transition-all uppercase tracking-widest", 
-                            statusFilter === s ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-black hover:text-slate-700"
-                          )}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex gap-2 p-1 bg-slate-50 rounded-xl border border-slate-200">
-                        <button onClick={() => setBillingSubMode('piutang')} className={cn("px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all", billingSubMode === 'piutang' ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-slate-600 hover:text-slate-900")}>Piutang</button>
-                        <button onClick={() => setBillingSubMode('hutang')} className={cn("px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all", billingSubMode === 'hutang' ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-slate-600 hover:text-slate-900")}>Hutang</button>
+              <Card className="col-span-12 border-slate-200/60 shadow-sm overflow-hidden min-h-[600px] flex flex-col justify-between">
+                <div>
+                  <CardHeader className="bg-slate-50/50 border-b border-slate-200 flex flex-col gap-4">
+                    <CardTitle className="text-base font-black text-slate-900 uppercase tracking-tight">Invoice & Piutang Pakan (PT MBF)</CardTitle>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-1 p-1 bg-white border border-slate-200 rounded-xl">
+                        {['Semua', 'Belum Lunas', 'Lunas'].map((s: any) => (
+                          <button 
+                            key={s} 
+                            onClick={() => setStatusFilter(s as any)}
+                            className={cn(
+                              "px-3 py-1 rounded-md text-[9px] font-black transition-all uppercase tracking-widest", 
+                              statusFilter === s ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-black hover:text-slate-700"
+                            )}
+                          >
+                            {s}
+                          </button>
+                        ))}
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Filter size={14} className="text-slate-300" />
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                          <input type="text" placeholder="Cari invoice pakan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-white border border-slate-200 rounded-lg py-1.5 pl-9 pr-3 text-xs font-bold w-48 outline-none focus:border-orange-200" />
+                      <div className="flex items-center gap-4">
+                        <div className="flex gap-2 p-1 bg-slate-50 rounded-xl border border-slate-200">
+                          <button onClick={() => setBillingSubMode('piutang')} className={cn("px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all", billingSubMode === 'piutang' ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-slate-600 hover:text-slate-900")}>Piutang</button>
+                          <button onClick={() => setBillingSubMode('hutang')} className={cn("px-4 py-1.5 rounded-md text-[9px] font-black uppercase tracking-widest transition-all", billingSubMode === 'hutang' ? "bg-orange-500 text-white shadow-sm shadow-orange-500/20" : "text-slate-600 hover:text-slate-900")}>Hutang</button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Filter size={14} className="text-slate-300" />
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                            <input type="text" placeholder="Cari invoice pakan..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="bg-white border border-slate-200 rounded-lg py-1.5 pl-9 pr-3 text-xs font-bold w-48 outline-none focus:border-orange-200" />
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="p-0 overflow-x-auto w-full min-w-0">
-                  <Table>
-                    <TableHeader className="bg-slate-50/30">
-                      <TableRow className="border-slate-100">
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-6">Invoice</TableHead>
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pelanggan</TableHead>
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Piutang</TableHead>
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</TableHead>
-                        <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest pr-6 text-center">Aksi</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {(() => {
-                        let list = (billingSubMode === "piutang" ? groupedFeedRecv : feedPayables) || [];
-                        if (billingSubMode === 'piutang' && agingFilter !== 'all') list = list.filter((t: any) => getAgingCat(t.created_at || t.tanggal) === agingFilter);
-                        if (statusFilter !== 'Semua') {
-                          list = list.filter((row: any) => {
-                            const total = Number(row.total_tagihan) || 0;
-                            const paid = Number(getPaid(row)) || 0;
-                            const diff = total - paid;
-                            return (diff <= 0 ? 'Lunas' : 'Belum Lunas') === statusFilter;
-                          });
-                        }
-                        if (searchQuery) {
-                          const q = searchQuery.toLowerCase();
-                          list = list.filter((row: any) => {
-                            const name = (row.nama_mitra || '').toLowerCase();
-                            const ket = (row.keterangan || '').toLowerCase();
-                            return name.includes(q) || ket.includes(q);
-                          });
-                        }
-
-                        if (list.length === 0) {
-                          return (
-                            <TableRow>
-                              <TableCell colSpan={5}>
-                                <EmptyState 
-                                  icon={FileText} 
-                                  title="Invoice Tidak Ditemukan" 
-                                  description="Tidak ada catatan tagihan pakan yang sesuai dengan filter saat ini." 
-                                />
-                              </TableCell>
-                            </TableRow>
-                          );
-                        }
-
-                        return list.map((row: any, i: number) => {
-                          const diff = (row.total_tagihan || 0) - getPaid(row);
-                          const status = diff === 0 ? 'Lunas' : getPaid(row) > 0 ? 'Sebagian' : 'Belum Bayar';
-                          const customer = row.nama_mitra || row.keterangan?.replace('Mitra: ', '') || '-';
-                          return (
-                            <TableRow key={row.id || i} className="group border-slate-50 hover:bg-slate-50 transition-colors">
-                               <TableCell className="pl-6 py-4">
-                                  <div className="flex flex-col">
-                                    <span className="text-xs font-black text-slate-900 tracking-tight uppercase">{generateInvoiceCode(row.id, row.created_at || row.tanggal, 'MBF')}</span>
-                                    <span className="text-[9px] font-bold text-slate-400 mt-0.5">{new Date(row.tanggal || Date.now()).toLocaleDateString('id-ID')}</span>
-                                  </div>
-                               </TableCell>
-                               <TableCell className="text-xs font-black text-slate-900 uppercase tracking-tight">
-                                  <span>{customer.split('|')[0].trim()}</span>
-                               </TableCell>
-                               <TableCell className="text-xs font-black text-slate-900">{formatMoney(diff)}</TableCell>
-                               <TableCell className="text-left">
-                                  <Badge className={cn("text-[8px] font-black uppercase border-none px-2 py-0.5", status === 'Lunas' ? "bg-green-100 text-green-600" : status === 'Sebagian' ? "bg-orange-100 text-orange-500" : "bg-red-100 text-red-600")}>{status}</Badge>
-                               </TableCell>
-                               <TableCell className="pr-6 text-center flex items-center justify-center gap-2">
-                                  {billingSubMode === 'piutang' && (
+                  </CardHeader>
+                  <CardContent className="p-0 overflow-x-auto w-full min-w-0">
+                    <Table>
+                      <TableHeader className="bg-slate-50/30">
+                        <TableRow className="border-slate-100">
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest pl-6">Invoice</TableHead>
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Pelanggan</TableHead>
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Piutang</TableHead>
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Status</TableHead>
+                          <TableHead className="text-[10px] font-black text-slate-500 uppercase tracking-widest pr-6 text-center">Aksi</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredFeedList.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={5}>
+                              <EmptyState 
+                                icon={FileText} 
+                                title="Invoice Tidak Ditemukan" 
+                                description="Tidak ada catatan tagihan pakan yang sesuai dengan filter saat ini." 
+                              />
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          paginatedFeedList.map((row: any, i: number) => {
+                            const diff = (row.total_tagihan || 0) - getPaid(row);
+                            const status = diff === 0 ? 'Lunas' : getPaid(row) > 0 ? 'Sebagian' : 'Belum Bayar';
+                            const customer = row.nama_mitra || row.keterangan?.replace('Mitra: ', '') || '-';
+                            return (
+                              <TableRow key={row.id || i} className="group border-slate-50 hover:bg-slate-50 transition-colors">
+                                 <TableCell className="pl-6 py-4">
+                                    <div className="flex flex-col">
+                                      <span className="text-xs font-black text-slate-900 tracking-tight uppercase">{generateInvoiceCode(row.id, row.created_at || row.tanggal, 'MBF')}</span>
+                                      <span className="text-[9px] font-bold text-slate-400 mt-0.5">{new Date(row.tanggal || Date.now()).toLocaleDateString('id-ID')}</span>
+                                    </div>
+                                 </TableCell>
+                                 <TableCell className="text-xs font-black text-slate-900 uppercase tracking-tight">
+                                    <span>{customer.split('|')[0].trim()}</span>
+                                 </TableCell>
+                                 <TableCell className="text-xs font-black text-slate-900">{formatMoney(diff)}</TableCell>
+                                 <TableCell className="text-left">
+                                    <Badge className={cn("text-[8px] font-black uppercase border-none px-2 py-0.5", status === 'Lunas' ? "bg-green-100 text-green-600" : status === 'Sebagian' ? "bg-orange-100 text-orange-500" : "bg-red-100 text-red-600")}>{status}</Badge>
+                                 </TableCell>
+                                 <TableCell className="pr-6 text-center flex items-center justify-center gap-2">
+                                    {billingSubMode === 'piutang' && (
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={(e) => { e.stopPropagation(); setExpandedInvoice(expandedInvoice === row.id ? null : row.id); }}
+                                        className={cn("h-8 w-8 p-0 rounded-lg transition-all border-none", expandedInvoice === row.id ? "bg-orange-100 text-orange-500" : "bg-slate-50 text-slate-400 hover:bg-slate-100")}
+                                      >
+                                        <FileText size={14} />
+                                      </Button>
+                                    )}
+                                    <Button 
+                                      variant="outline" 
+                                      size="sm" 
+                                      onClick={(e) => { e.stopPropagation(); setSelectedInvoice(row); setInvoiceModalMode('bayar'); fetchPaymentHistory(row.id); }}
+                                      className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest bg-orange-500 hover:bg-orange-600 text-white border-none shadow-sm shadow-orange-500/20"
+                                    >
+                                      Bayar
+                                    </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
-                                      onClick={(e) => { e.stopPropagation(); setExpandedInvoice(expandedInvoice === row.id ? null : row.id); }}
-                                      className={cn("h-8 w-8 p-0 rounded-lg transition-all border-none", expandedInvoice === row.id ? "bg-orange-100 text-orange-500" : "bg-slate-50 text-slate-400 hover:bg-slate-100")}
+                                      onClick={(e) => { e.stopPropagation(); setSelectedFeedDetail(row); setIsFeedDetailOpen(true); fetchPaymentHistory(row.id); }}
+                                      className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:bg-orange-50"
                                     >
-                                      <FileText size={14} />
+                                      Detail
                                     </Button>
-                                  )}
-                                  <Button 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={(e) => { e.stopPropagation(); setSelectedInvoice(row); setInvoiceModalMode('bayar'); fetchPaymentHistory(row.id); }}
-                                    className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest bg-orange-500 hover:bg-orange-600 text-white border-none shadow-sm shadow-orange-500/20"
-                                  >
-                                    Bayar
-                                  </Button>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={(e) => { e.stopPropagation(); setSelectedFeedDetail(row); setIsFeedDetailOpen(true); fetchPaymentHistory(row.id); }}
-                                    className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-600 hover:text-slate-900 hover:bg-orange-50"
-                                  >
-                                    Detail
-                                  </Button>
-                                </TableCell>
-                            </TableRow>
-                          );
-                        });
-                      })()}
-                    </TableBody>
-                  </Table>
-                </CardContent>
+                                  </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </div>
+                {renderPaginationFooter(currentPagePakan, totalPagesPakan, filteredFeedList.length, setCurrentPagePakan)}
               </Card>
             </div>
 
@@ -894,7 +1065,7 @@ export function BillingView() {
                     return (
                       <div className="flex flex-col gap-4">
                          <div ref={printRefPakan} className="print:m-0 print:p-0 flex justify-center print:block">
-                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in]">
+                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout">
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
                                   <img src={logoMBF} alt="" className="w-[60%] h-auto object-contain" />
                                </div>
@@ -980,14 +1151,69 @@ export function BillingView() {
                            </div>
                          </div>
 
-                         <div className="flex gap-2 justify-center">
-                            <Button onClick={() => handlePrintPakan()} className="w-64 btn-primary h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest">
-                               <Printer size={16} /> Cetak Invoice
-                            </Button>
-                            <Button onClick={() => handleKirimWA(activeInvoice, false)} variant="outline" className="w-64 h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 bg-slate-100 hover:bg-slate-200 border-none">
-                               <MessageCircle size={16} className="text-green-600" /> Kirim WA
-                            </Button>
-                         </div>
+                         {/* Print Settings Panel */}
+                          <div className="mx-auto w-full max-w-[9.5in] flex flex-col items-center gap-3">
+                            <button
+                              onClick={() => setShowPrintSettings(v => !v)}
+                              className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-orange-500 transition-colors"
+                            >
+                              <Printer size={12} />
+                              {showPrintSettings ? 'Sembunyikan Pengaturan Cetak ▲' : 'Pengaturan Cetak ▼'}
+                            </button>
+                            {showPrintSettings && (
+                              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-wrap gap-6 items-end w-full max-w-xl">
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Orientasi</label>
+                                  <select
+                                    value={printOrientation}
+                                    onChange={e => setPrintOrientation(e.target.value as any)}
+                                    className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 bg-white outline-none focus:border-orange-300"
+                                  >
+                                    <option value="landscape">Landscape (Horizontal)</option>
+                                    <option value="portrait">Portrait (Vertikal)</option>
+                                  </select>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Margin</label>
+                                  <select
+                                    value={printMargin}
+                                    onChange={e => setPrintMargin(e.target.value)}
+                                    className="border border-slate-200 rounded-lg px-3 py-1.5 text-xs font-bold text-slate-700 bg-white outline-none focus:border-orange-300"
+                                  >
+                                    <option value="0">Tanpa Margin</option>
+                                    <option value="5mm">Kecil (5mm)</option>
+                                    <option value="10mm">Normal (10mm)</option>
+                                    <option value="15mm">Besar (15mm)</option>
+                                    <option value="20mm">Sangat Besar (20mm)</option>
+                                  </select>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-400">Skala: {printScale}%</label>
+                                  <input
+                                    type="range"
+                                    min={50}
+                                    max={100}
+                                    step={5}
+                                    value={printScale}
+                                    onChange={e => setPrintScale(Number(e.target.value))}
+                                    className="w-36 accent-orange-500"
+                                  />
+                                </div>
+                                <p className="text-[9px] text-slate-400 font-bold italic leading-tight">
+                                  💡 Nota terpotong? Kurangi Skala<br/>atau ganti Margin ke "Tanpa Margin"
+                                </p>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="flex gap-2 justify-center">
+                             <Button onClick={() => applyPrintAndPrint(handlePrintPakan)} className="w-64 btn-primary h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest">
+                                <Printer size={16} /> Cetak Invoice
+                             </Button>
+                             <Button onClick={() => handleKirimWA(activeInvoice, false)} variant="outline" className="w-64 h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 bg-slate-100 hover:bg-slate-200 border-none">
+                                <MessageCircle size={16} className="text-green-600" /> Kirim WA
+                             </Button>
+                          </div>
                       </div>
                     );
                  })()}

@@ -121,6 +121,36 @@ export function ExportView() {
     return Object.entries(map).sort((a, b) => b[1].total - a[1].total);
   }, [eggSales]);
 
+  // --- PREVIEW PAGINATION STATE ---
+  const PAGE_SIZE = 15;
+  const [feedSalesPage, setFeedSalesPage] = useState(1);
+  const [feedPurchasesPage, setFeedPurchasesPage] = useState(1);
+  const [eggSalesPage, setEggSalesPage] = useState(1);
+  const [eggPurchasesPage, setEggPurchasesPage] = useState(1);
+
+  // Reset all pages when entity or month changes
+  React.useEffect(() => {
+    setFeedSalesPage(1);
+    setFeedPurchasesPage(1);
+    setEggSalesPage(1);
+    setEggPurchasesPage(1);
+  }, [selectedEntity, selectedMonth]);
+
+  const feedSalesTotalPages = Math.max(1, Math.ceil(feedSales.length / PAGE_SIZE));
+  const feedPurchasesTotalPages = Math.max(1, Math.ceil(feedPurchases.length / PAGE_SIZE));
+  const eggSalesTotalPages = Math.max(1, Math.ceil(eggSales.length / PAGE_SIZE));
+  const eggPurchasesTotalPages = Math.max(1, Math.ceil(eggPurchases.length / PAGE_SIZE));
+
+  // Helper: pagination nav component
+  const PrevNextNav = ({ page, totalPages, onPrev, onNext }: { page: number; totalPages: number; onPrev: () => void; onNext: () => void }) =>
+    totalPages > 1 ? (
+      <div className="flex justify-center items-center gap-3 mt-3 print:hidden">
+        <Button variant="outline" size="sm" onClick={onPrev} disabled={page === 1} className="px-3 h-7 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500">◀ Prev</Button>
+        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Hal {page} / {totalPages}</span>
+        <Button variant="outline" size="sm" onClick={onNext} disabled={page === totalPages} className="px-3 h-7 rounded-lg text-[9px] font-black uppercase tracking-widest text-slate-500">Next ▶</Button>
+      </div>
+    ) : null;
+
   // --- PRINT ---
   const printRefLaporan = useRef<HTMLDivElement>(null);
   const handlePrintLaporan = useReactToPrint({ contentRef: printRefLaporan });
@@ -570,6 +600,7 @@ export function ExportView() {
                         Rincian Penjualan Pakan ({feedSales.length} Transaksi)
                       </h3>
                       {feedSales.length > 0 ? (
+                        <>
                         <Table>
                           <TableHeader>
                             <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
@@ -586,13 +617,15 @@ export function ExportView() {
                           </TableHeader>
                           <TableBody>
                             {[...feedSales].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                              const isVisible = tIdx >= (feedSalesPage - 1) * PAGE_SIZE && tIdx < feedSalesPage * PAGE_SIZE;
+                              const rowVisibilityClass = !isVisible ? "hidden print:table-row" : "";
                               const details = t.details || [];
                               const sisa = (t.total_tagihan || 0) - (t.dibayar_hari_ini || 0);
                               const inv = generateInvoiceCode(t.id, t.tanggal, 'MBF');
 
                               if (details.length === 0) {
                                 return (
-                                  <TableRow key={tIdx} className="border-b border-slate-100 hover:bg-transparent">
+                                  <TableRow key={tIdx} className={cn("border-b border-slate-100 hover:bg-transparent", rowVisibilityClass)}>
                                     <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{tIdx + 1}</TableCell>
                                     <TableCell className="py-1.5 text-[8px] font-black text-slate-700 p-0">{inv}</TableCell>
                                     <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
@@ -611,7 +644,8 @@ export function ExportView() {
                               return details.map((d: any, dIdx: number) => (
                                 <TableRow key={`${tIdx}-${dIdx}`} className={cn(
                                   "hover:bg-transparent",
-                                  dIdx === details.length - 1 ? "border-b border-slate-100" : "border-b border-slate-50/50"
+                                  dIdx === details.length - 1 ? "border-b border-slate-100" : "border-b border-slate-50/50",
+                                  rowVisibilityClass
                                 )}>
                                   <TableCell className="py-1 text-[8px] font-bold text-slate-400 p-0">{dIdx === 0 ? tIdx + 1 : ''}</TableCell>
                                   <TableCell className="py-1 text-[8px] font-black text-slate-700 p-0">{dIdx === 0 ? inv : ''}</TableCell>
@@ -635,6 +669,8 @@ export function ExportView() {
                             </TableRow>
                           </TableBody>
                         </Table>
+                        <PrevNextNav page={feedSalesPage} totalPages={feedSalesTotalPages} onPrev={() => setFeedSalesPage(p => Math.max(1, p-1))} onNext={() => setFeedSalesPage(p => Math.min(feedSalesTotalPages, p+1))} />
+                        </>
                       ) : (
                         <p className="text-[9px] font-bold text-slate-400 italic py-4">Tidak ada transaksi penjualan pakan di periode ini.</p>
                       )}
@@ -662,14 +698,14 @@ export function ExportView() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {[...feedPurchases].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                          {feedPurchasesPageData.map((t, tIdx) => {
                             const details = t.details || [];
                             const sisa = (t.total_tagihan || 0) - (t.dibayar_hari_ini || 0);
                             const inv = generateInvoiceCode(t.id, t.tanggal, 'MBF');
 
                             if (details.length === 0) {
                               return (
-                                <TableRow key={tIdx} className="border-b border-slate-100 hover:bg-transparent">
+                                <TableRow key={tIdx} className={cn("border-b border-slate-100 hover:bg-transparent", rowVisibilityClass)}>
                                   <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{tIdx + 1}</TableCell>
                                   <TableCell className="py-1.5 text-[8px] font-black text-slate-700 p-0">{inv}</TableCell>
                                   <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
@@ -721,6 +757,7 @@ export function ExportView() {
                         Rincian Penjualan Telur ({eggSales.length} Transaksi)
                       </h3>
                       {eggSales.length > 0 ? (
+                        <>
                         <Table>
                           <TableHeader>
                             <TableRow className="border-b-2 border-slate-200 hover:bg-transparent">
@@ -736,14 +773,14 @@ export function ExportView() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {[...eggSales].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                            {eggSalesPageData.map((t, tIdx) => {
                               const items = parseEggItems(t.keterangan || '');
                               const mitra = getEggMitra(t);
                               const inv = generateInvoiceCode(t.id, t.tanggal, 'BEF');
 
                               if (items.length === 0) {
                                 return (
-                                  <TableRow key={tIdx} className="border-b border-slate-100 hover:bg-transparent">
+                                  <TableRow key={tIdx} className={cn("border-b border-slate-100 hover:bg-transparent", rowVisibilityClass)}>
                                     <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{tIdx + 1}</TableCell>
                                     <TableCell className="py-1.5 text-[8px] font-black text-slate-700 p-0">{inv}</TableCell>
                                     <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>
@@ -787,6 +824,8 @@ export function ExportView() {
                             </TableRow>
                           </TableBody>
                         </Table>
+                        <PrevNextNav page={eggSalesPage} totalPages={eggSalesTotalPages} onPrev={() => setEggSalesPage(p => Math.max(1, p-1))} onNext={() => setEggSalesPage(p => Math.min(eggSalesTotalPages, p+1))} />
+                        </>
                       ) : (
                         <p className="text-[9px] font-bold text-slate-400 italic py-4">Tidak ada transaksi penjualan telur di periode ini.</p>
                       )}
@@ -814,14 +853,14 @@ export function ExportView() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {[...eggPurchases].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                          {eggPurchasesPageData.map((t, tIdx) => {
                             const items = parseEggItems(t.keterangan || '');
                             const mitra = getEggMitra(t);
                             const inv = generateInvoiceCode(t.id, t.tanggal, 'BEF');
 
                             if (items.length === 0) {
                               return (
-                                <TableRow key={tIdx} className="border-b border-slate-100 hover:bg-transparent">
+                                <TableRow key={tIdx} className={cn("border-b border-slate-100 hover:bg-transparent", rowVisibilityClass)}>
                                   <TableCell className="py-1.5 text-[8px] font-bold text-slate-400 p-0">{tIdx + 1}</TableCell>
                                   <TableCell className="py-1.5 text-[8px] font-black text-slate-700 p-0">{inv}</TableCell>
                                   <TableCell className="py-1.5 text-[8px] font-bold text-slate-500 p-0">{new Date(t.tanggal).toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit' })}</TableCell>

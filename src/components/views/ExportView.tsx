@@ -701,7 +701,9 @@ export function ExportView() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {feedPurchasesPageData.map((t, tIdx) => {
+                          {[...feedPurchases].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                              const isVisible = tIdx >= (feedPurchasesPage - 1) * PAGE_SIZE && tIdx < feedPurchasesPage * PAGE_SIZE;
+                              const rowVisibilityClass = !isVisible ? "hidden print:table-row" : "";
                             const details = t.details || [];
                             const sisa = (t.total_tagihan || 0) - (t.dibayar_hari_ini || 0);
                             const inv = generateInvoiceCode(t.id, t.tanggal, 'MBF');
@@ -776,7 +778,9 @@ export function ExportView() {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {eggSalesPageData.map((t, tIdx) => {
+                            {[...eggSales].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                                const isVisible = tIdx >= (eggSalesPage - 1) * PAGE_SIZE && tIdx < eggSalesPage * PAGE_SIZE;
+                                const rowVisibilityClass = !isVisible ? "hidden print:table-row" : "";
                               const items = parseEggItems(t.keterangan || '');
                               const mitra = getEggMitra(t);
                               const inv = generateInvoiceCode(t.id, t.tanggal, 'BEF');
@@ -856,7 +860,9 @@ export function ExportView() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {eggPurchasesPageData.map((t, tIdx) => {
+                          {[...eggPurchases].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime()).map((t, tIdx) => {
+                              const isVisible = tIdx >= (eggPurchasesPage - 1) * PAGE_SIZE && tIdx < eggPurchasesPage * PAGE_SIZE;
+                              const rowVisibilityClass = !isVisible ? "hidden print:table-row" : "";
                             const items = parseEggItems(t.keterangan || '');
                             const mitra = getEggMitra(t);
                             const inv = generateInvoiceCode(t.id, t.tanggal, 'BEF');

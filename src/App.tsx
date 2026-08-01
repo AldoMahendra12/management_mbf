@@ -11,6 +11,7 @@ import { ModalOrchestrator } from './components/modals/ModalOrchestrator';
 import { DashboardView } from './components/views/DashboardView';
 import { FeedWarehouseView } from './components/views/FeedWarehouseView';
 import { EggWarehouseView } from './components/views/EggWarehouseView';
+import { ProduksiPakanView } from './components/views/ProduksiPakanView';
 import { PopulationView } from './components/views/PopulationView';
 import { BillingView } from './components/views/BillingView';
 import { FinanceView } from './components/views/FinanceView';
@@ -60,6 +61,7 @@ export default function App() {
       case 'Beranda': return <DashboardView />;
       case 'Gudang Telur': return <EggWarehouseView />;
       case 'Gudang Pakan': return <FeedWarehouseView />;
+      case 'Produksi Pakan': return <ProduksiPakanView />;
       case 'Afkir': return <PopulationView />;
       case 'Tagihan': return <BillingView />;
       case 'Keuangan': return <FinanceView />;

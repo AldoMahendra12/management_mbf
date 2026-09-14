@@ -12,8 +12,8 @@ const FALLBACK_FEED_ITEMS = [
   { id: 'f8',  nama_bahan: 'Mineral',         satuan: 'kg',  stok_sekarang: 678, batas_minimum: 50,   harga_jual_default: 4000 },
   { id: 'f9',  nama_bahan: 'SAMS QUIN',       satuan: 'kg',  stok_sekarang: 370, batas_minimum: 10,   harga_jual_default: 328500 },
   { id: 'f10', nama_bahan: 'MIX SAMS',        satuan: 'kg',  stok_sekarang: 253, batas_minimum: 10,   harga_jual_default: 70000 },
-  { id: 'f11', nama_bahan: '758-3',           satuan: 'sak', stok_sekarang: 76, batas_minimum: 10,   harga_jual_default: 0 },
-  { id: 'f12', nama_bahan: '758-2',           satuan: 'sak', stok_sekarang: 8, batas_minimum: 10,   harga_jual_default: 0 },
+  { id: 'f11', nama_bahan: '785-3',           satuan: 'sak', stok_sekarang: 76, batas_minimum: 10,   harga_jual_default: 0 },
+  { id: 'f12', nama_bahan: '785-2',           satuan: 'sak', stok_sekarang: 8, batas_minimum: 10,   harga_jual_default: 0 },
 ];
 
 export const useSupabaseData = (supabase: any) => {

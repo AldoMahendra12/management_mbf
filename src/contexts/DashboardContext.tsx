@@ -663,8 +663,8 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       'mineral': ['mineral'],
       'sams quin': ['sams quin', 'samquin', 'quin'],
       'mix sams': ['mix sams', 'mixsams'],
-      '758-3': ['758-3', '7583'],
-      '758-2': ['758-2', '7582'],
+      '785-3': ['785-3', '7853', '758-3', '7583'],
+      '785-2': ['785-2', '7852', '758-2', '7582'],
     };
 
     // 1. Try exact match first

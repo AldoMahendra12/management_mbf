@@ -289,11 +289,76 @@ export function BillingView() {
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   /**
+   * Helper untuk mengonversi gambar di dalam invoice menjadi Data URL (Base64)
+   * agar html2canvas 100% bebas dari isu CORS & Tainted Canvas di semua browser/Vercel.
+   */
+  const inlineAllImages = async (container: HTMLElement) => {
+    const images = Array.from(container.getElementsByTagName('img'));
+    await Promise.all(
+      images.map(async (img) => {
+        if (!img.src || img.src.startsWith('data:')) return;
+        try {
+          // 1. Coba lewat canvas lokal jika gambar sudah ter-decode
+          if (img.complete && img.naturalWidth > 0) {
+            try {
+              const c = document.createElement('canvas');
+              c.width = img.naturalWidth;
+              c.height = img.naturalHeight;
+              const ctx = c.getContext('2d');
+              if (ctx) {
+                ctx.drawImage(img, 0, 0);
+                const data = c.toDataURL('image/png');
+                if (data && data.length > 100) {
+                  img.src = data;
+                  return;
+                }
+              }
+            } catch (err) {
+              // Jika canvas lokal tainted, lanjut ke fetch blob
+            }
+          }
+
+          // 2. Fetch blob dan baca dengan FileReader
+          const res = await fetch(img.src);
+          const blob = await res.blob();
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve((reader.result as string) || '');
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          if (base64) img.src = base64;
+        } catch (e) {
+          console.warn('Gagal inline image, tetap melanjutkan render:', e);
+        }
+      })
+    );
+  };
+
+  /**
    * Generate PDF dari elemen invoice HTML lalu otomatis download,
    * kemudian buka WhatsApp dengan teks pembuka singkat + info invoice.
    */
   const handleKirimWAPdf = async (invoice: any, isTelur: boolean, printRef: React.RefObject<HTMLDivElement | null>) => {
-    if (!invoice || !printRef.current) return;
+    if (!invoice) return;
+    
+    // Pastikan invoice preview sudah terbuka
+    const invoiceWrapper = printRef.current;
+    const targetElement = (invoiceWrapper?.querySelector('.invoice-print-layout') || invoiceWrapper) as HTMLElement | null;
+    
+    if (!targetElement) {
+      alert('Silakan klik ikon file (📄) pada baris invoice terlebih dahulu agar preview invoice muncul.');
+      return;
+    }
+
+    // Buka tab WhatsApp di awal untuk mencegah diblokir oleh popup blocker browser
+    let waWindow = null;
+    try {
+      waWindow = window.open('about:blank', '_blank');
+    } catch (e) {
+      // Abaikan jika browser memblokir popup
+    }
+
     setIsGeneratingPdf(true);
     try {
       const code = generateInvoiceCode(invoice.id, invoice.created_at || invoice.tanggal, isTelur ? 'BEF' : 'MBF');
@@ -320,16 +385,30 @@ export function BillingView() {
       const total = Number(invoice.total_tagihan || invoice.total_harga || 0);
       const diff = total - getPaid(invoice);
 
-      // ── 1. Generate & Download PDF ─────────────────────────────────
-      const element = printRef.current;
-      const canvas = await html2canvas(element, {
+      // ── 1. Inline semua gambar ke Base64 agar 100% bebas CORS ───────
+      await inlineAllImages(targetElement);
+
+      // ── 2. Render HTML ke Canvas ────────────────────────────────────
+      const canvas = await html2canvas(targetElement, {
         scale: 2,
         useCORS: true,
+        allowTaint: true,
         backgroundColor: '#ffffff',
         logging: false,
+        imageTimeout: 10000,
+        onclone: (_, clonedEl) => {
+          clonedEl.style.transform = 'none';
+        }
       });
 
-      const imgData = canvas.toDataURL('image/png');
+      let imgData = '';
+      try {
+        imgData = canvas.toDataURL('image/png');
+      } catch (canvasErr) {
+        // Fallback jika PNG gagal
+        imgData = canvas.toDataURL('image/jpeg', 0.95);
+      }
+
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -348,7 +427,7 @@ export function BillingView() {
       const fileName = `Invoice-${companyShort}-${safeCustomer}-${code}.pdf`;
       pdf.save(fileName);
 
-      // ── 2. Buka WhatsApp dengan teks pembuka ─────────────────────────
+      // ── 3. Buka WhatsApp dengan teks pembuka ─────────────────────────
       const dateLine = formattedDate ? `, tanggal *${formattedDate}*` : '';
       const waText =
 `Halo Bapak/Ibu *${customerName}* 👋
@@ -363,10 +442,19 @@ Rincian lengkap pesanan telah kami lampirkan dalam file PDF yang dikirimkan bers
 Terima kasih atas kepercayaan dan kerja samanya 🙏
 _${companyName}_`;
 
-      setTimeout(() => window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank'), 600);
+      const targetWaUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
+      if (waWindow && !waWindow.closed) {
+        waWindow.location.href = targetWaUrl;
+      } else {
+        window.open(targetWaUrl, '_blank');
+      }
     } catch (err) {
       console.error('Gagal generate PDF:', err);
-      alert('Gagal membuat PDF. Pastikan invoice sudah dibuka (klik ikon 📄) terlebih dahulu.');
+      // Tutup tab kosong jika ada
+      if (waWindow && !waWindow.closed) {
+        waWindow.close();
+      }
+      alert(`Gagal membuat PDF otomatis: ${err?.message || 'Terjadi kesalahan sistem'}.\nAnda tetap dapat mencetak ke PDF menggunakan tombol 'Cetak Invoice' lalu pilih 'Simpan sebagai PDF'.`);
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -770,13 +858,13 @@ _${companyName}_`;
                          <div ref={printRefTelur} className="print:m-0 print:p-0 flex justify-center print:block">
                             <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout">
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
-                                  <img src={logoBEF} alt="" className="w-[60%] h-auto object-contain" />
+                                  <img src={logoBEF} alt="" crossOrigin="anonymous" className="w-[60%] h-auto object-contain" />
                                </div>
 
                                <div className="relative z-10 h-full w-full flex flex-col gap-4">
                                  <div className="flex justify-between items-center border-b-2 border-black pb-4">
                                     <div className="flex gap-4 items-center">
-                                       <img src={logoBEF} alt="BEF" className="w-16 h-16 object-contain" />
+                                       <img src={logoBEF} alt="BEF" crossOrigin="anonymous" className="w-16 h-16 object-contain" />
                                        <div>
                                           <h1 className="text-xl font-black tracking-tighter text-black uppercase">CV BERKAH EGG FARM</h1>
                                           <p className="text-[10px] font-bold text-black uppercase tracking-widest leading-tight">Pengepul & Supplier Telur Ayam<br/>Tulungagung, Jawa Timur</p>
@@ -1164,13 +1252,13 @@ _${companyName}_`;
                          <div ref={printRefPakan} className="print:m-0 print:p-0 flex justify-center print:block">
                             <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout">
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
-                                  <img src={logoMBF} alt="" className="w-[60%] h-auto object-contain" />
+                                  <img src={logoMBF} alt="" crossOrigin="anonymous" className="w-[60%] h-auto object-contain" />
                                </div>
 
                                <div className="relative z-10 h-full w-full flex flex-col gap-4">
                                   <div className="flex justify-between items-center border-b-2 border-black pb-4">
                                      <div className="flex gap-4 items-center">
-                                        <img src={logoMBF} alt="MBF" className="w-16 h-16 object-contain" />
+                                        <img src={logoMBF} alt="MBF" crossOrigin="anonymous" className="w-16 h-16 object-contain" />
                                         <div>
                                            <h1 className="text-xl font-black tracking-tighter text-black uppercase">PT. MITRA BAROKAH FARM</h1>
                                            <p className="text-[10px] font-bold text-black uppercase tracking-widest leading-tight">Divisi Distribusi Pakan Ternak<br/>Tulungagung, Jawa Timur</p>

@@ -5,9 +5,12 @@ import {
   Search, 
   Printer,
   Filter,
-  MessageCircle
+  MessageCircle,
+  Loader2
 } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
+import jsPDF from 'jspdf';
+import html2canvas from 'html2canvas';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -282,6 +285,92 @@ export function BillingView() {
 
   const printRefPakan = useRef<HTMLDivElement>(null);
   const handlePrintPakan = useReactToPrint({ contentRef: printRefPakan, documentTitle: " " });
+
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  /**
+   * Generate PDF dari elemen invoice HTML lalu otomatis download,
+   * kemudian buka WhatsApp dengan teks pembuka singkat + info invoice.
+   */
+  const handleKirimWAPdf = async (invoice: any, isTelur: boolean, printRef: React.RefObject<HTMLDivElement | null>) => {
+    if (!invoice || !printRef.current) return;
+    setIsGeneratingPdf(true);
+    try {
+      const code = generateInvoiceCode(invoice.id, invoice.created_at || invoice.tanggal, isTelur ? 'BEF' : 'MBF');
+      const companyName = isTelur ? 'CV Berkah Egg Farm' : 'PT. Mitra Barokah Farm';
+      const companyShort = isTelur ? 'CVBEF' : 'PTMBF';
+
+      let customerName = '';
+      if (isTelur) {
+        customerName = (invoice.keterangan || '').split('|')[0]?.replace('Mitra: ', '').trim() || 'Pelanggan';
+      } else {
+        customerName = invoice.nama_mitra || invoice.keterangan?.replace('Mitra: ', '') || 'Peternak';
+        customerName = customerName.split('|')[0].trim();
+      }
+
+      const rawDate = invoice.tanggal || invoice.created_at;
+      let formattedDate = "";
+      if (rawDate) {
+        const d = new Date(rawDate);
+        if (!isNaN(d.getTime())) {
+          formattedDate = d.toLocaleDateString('id-ID', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        }
+      }
+
+      const total = Number(invoice.total_tagihan || invoice.total_harga || 0);
+      const diff = total - getPaid(invoice);
+
+      // ── 1. Generate & Download PDF ─────────────────────────────────
+      const element = printRef.current;
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false,
+      });
+
+      const imgData = canvas.toDataURL('image/png');
+      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const ratio = canvas.width / canvas.height;
+      let imgW = pageWidth;
+      let imgH = pageWidth / ratio;
+      if (imgH > pageHeight) {
+        imgH = pageHeight;
+        imgW = pageHeight * ratio;
+      }
+      const offsetX = (pageWidth - imgW) / 2;
+      const offsetY = (pageHeight - imgH) / 2;
+      pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgW, imgH);
+
+      const safeCustomer = customerName.replace(/[^a-zA-Z0-9]/g, '-');
+      const fileName = `Invoice-${companyShort}-${safeCustomer}-${code}.pdf`;
+      pdf.save(fileName);
+
+      // ── 2. Buka WhatsApp dengan teks pembuka ─────────────────────────
+      const dateLine = formattedDate ? `, tanggal *${formattedDate}*` : '';
+      const waText =
+`Halo Bapak/Ibu *${customerName}* 👋
+
+Berikut kami sampaikan invoice tagihan dari *${companyName}*${dateLine}.
+
+📄 *No. Invoice:* ${code}
+💰 *Total Tagihan:* Rp${diff.toLocaleString('id-ID')}
+
+Rincian lengkap pesanan telah kami lampirkan dalam file PDF yang dikirimkan bersama pesan ini. Mohon segera dikonfirmasi ya.
+
+Terima kasih atas kepercayaan dan kerja samanya 🙏
+_${companyName}_`;
+
+      setTimeout(() => window.open(`https://wa.me/?text=${encodeURIComponent(waText)}`, '_blank'), 600);
+    } catch (err) {
+      console.error('Gagal generate PDF:', err);
+      alert('Gagal membuat PDF. Pastikan invoice sudah dibuka (klik ikon 📄) terlebih dahulu.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
   const handleKirimWA = (invoice: any, isTelur: boolean) => {
     if (!invoice) return;
@@ -854,9 +943,17 @@ export function BillingView() {
                              <Button onClick={() => applyPrintAndPrint(handlePrintTelur)} className="w-64 btn-primary h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest">
                                 <Printer size={16} /> Cetak Invoice
                              </Button>
-                             <Button onClick={() => handleKirimWA(activeInvoice, true)} variant="outline" className="w-64 h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 bg-slate-100 hover:bg-slate-200 border-none">
-                                <MessageCircle size={16} className="text-green-600" /> WA Invoice
-                             </Button>
+                             <Button onClick={() => handleKirimWAPdf(activeInvoice, true, printRefTelur)}
+                                disabled={isGeneratingPdf}
+                                variant="outline"
+                                className="w-64 h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest text-white bg-green-500 hover:bg-green-600 border-none shadow-sm shadow-green-500/20 disabled:opacity-70"
+                              >
+                                {isGeneratingPdf ? (
+                                  <><Loader2 size={16} className="animate-spin" /> Membuat PDF...</>
+                                ) : (
+                                  <><MessageCircle size={16} /> 📎 WA + PDF</>
+                                )}
+                              </Button>
                           </div>
                       </div>
                     );
@@ -1210,9 +1307,17 @@ export function BillingView() {
                              <Button onClick={() => applyPrintAndPrint(handlePrintPakan)} className="w-64 btn-primary h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest">
                                 <Printer size={16} /> Cetak Invoice
                              </Button>
-                             <Button onClick={() => handleKirimWA(activeInvoice, false)} variant="outline" className="w-64 h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest text-slate-600 bg-slate-100 hover:bg-slate-200 border-none">
-                                <MessageCircle size={16} className="text-green-600" /> Kirim WA
-                             </Button>
+                             <Button onClick={() => handleKirimWAPdf(activeInvoice, false, printRefPakan)}
+                                disabled={isGeneratingPdf}
+                                variant="outline"
+                                className="w-64 h-11 gap-2 rounded-lg text-xs font-black uppercase tracking-widest text-white bg-green-500 hover:bg-green-600 border-none shadow-sm shadow-green-500/20 disabled:opacity-70"
+                              >
+                                {isGeneratingPdf ? (
+                                  <><Loader2 size={16} className="animate-spin" /> Membuat PDF...</>
+                                ) : (
+                                  <><MessageCircle size={16} /> 📎 WA + PDF</>
+                                )}
+                              </Button>
                           </div>
                       </div>
                     );

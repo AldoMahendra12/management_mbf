@@ -386,26 +386,22 @@ export function BillingView() {
       await inlineAllImages(targetElement);
 
       // ── 2. Render HTML ke Image (Persis 100% Sama dengan Preview di Layar) ──
-      // Gunakan ukuran aktual kartu preview di layar
-      const actualWidth = targetElement.offsetWidth || 912;
-      const actualHeight = targetElement.offsetHeight || 528;
+      // Gunakan dimensi aktual yang lega agar tidak mepet
+      const actualWidth = targetElement.scrollWidth || targetElement.offsetWidth || 912;
+      const actualHeight = targetElement.scrollHeight || targetElement.offsetHeight || 528;
 
+      // Render dengan font asli aplikasi (tanpa skipFonts agar font Inter / font-black ter-embed sempurna)
       const imgData = await toPng(targetElement, {
         width: actualWidth,
         height: actualHeight,
         quality: 1,
-        pixelRatio: 3, // Resolusi tinggi super tajam
+        pixelRatio: 3, // Resolusi Ultra-HD super tajam
         backgroundColor: '#ffffff',
-        skipFonts: true,
-        style: {
-          fontFamily: 'Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif',
-          margin: '0',
-          transform: 'none',
-        }
+        cacheBust: true,
       });
 
       // ── 3. Generate PDF Dokumen Pas Proporsional Seperti Kartu Preview ──
-      // Ukuran faktur landscape 9.5in x 5.5in (241.3mm x 139.7mm)
+      // Ukuran faktur landscape 9.5in (241.3mm) x proporsional tinggi aktual
       const pdfWidthMm = 241.3;
       const pdfHeightMm = (actualHeight / actualWidth) * pdfWidthMm;
 
@@ -854,7 +850,7 @@ _${companyName}_`;
                     return (
                       <div className="flex flex-col gap-4">
                          <div ref={printRefTelur} className="print:m-0 print:p-0 flex justify-center print:block">
-                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-6 flex flex-col relative border border-slate-200 shadow-sm print:border-none print:shadow-none print:rounded-none rounded-2xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout" style={{ fontFamily: 'Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif' }}>
+                            <div className="w-full max-w-[9.5in] min-h-[5.5in] h-auto mx-auto bg-white text-black px-10 pt-8 pb-12 flex flex-col relative border border-slate-200 shadow-sm print:border-none print:shadow-none print:rounded-none rounded-2xl print:w-[9.5in] print:min-h-[5.5in] invoice-print-layout" >
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
                                   <img src={logoBEF} alt="" crossOrigin="anonymous" className="w-[60%] h-auto object-contain" />
                                </div>
@@ -961,12 +957,12 @@ _${companyName}_`;
                                           <div className="w-24 border-b border-black mx-auto" />
                                        </div>
                                     </div>
-                                    <div className="w-64 space-y-1">
-                                       <div className="flex justify-between items-center pt-1">
-                                          <span className="text-[11px] font-black uppercase text-black tracking-widest">Grand Total</span>
-                                          <span className="text-lg font-black text-black tracking-tighter leading-none">{formatMoney(total)}</span>
-                                       </div>
-                                    </div>
+                                    <div className="space-y-1 ml-auto">
+                                        <div className="flex items-baseline justify-end gap-6 pt-1">
+                                           <span className="text-xs font-black uppercase text-black tracking-widest whitespace-nowrap">Grand Total</span>
+                                           <span className="text-xl font-black text-black tracking-tight leading-none whitespace-nowrap">{formatMoney(total)}</span>
+                                        </div>
+                                     </div>
                                  </div>
                               </div>
                            </div>
@@ -1248,7 +1244,7 @@ _${companyName}_`;
                     return (
                       <div className="flex flex-col gap-4">
                          <div ref={printRefPakan} className="print:m-0 print:p-0 flex justify-center print:block">
-                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-6 flex flex-col relative border border-slate-200 shadow-sm print:border-none print:shadow-none print:rounded-none rounded-2xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout" style={{ fontFamily: 'Inter, "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, sans-serif' }}>
+                            <div className="w-full max-w-[9.5in] min-h-[5.5in] h-auto mx-auto bg-white text-black px-10 pt-8 pb-12 flex flex-col relative border border-slate-200 shadow-sm print:border-none print:shadow-none print:rounded-none rounded-2xl print:w-[9.5in] print:min-h-[5.5in] invoice-print-layout" >
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
                                   <img src={logoMBF} alt="" crossOrigin="anonymous" className="w-[60%] h-auto object-contain" />
                                </div>
@@ -1326,9 +1322,12 @@ _${companyName}_`;
                                           <div className="pt-4"><div className="w-32 border-b border-black mx-auto" /><p className="text-[9px] font-black uppercase tracking-widest text-black mt-1">Pelanggan</p></div>
                                        </div>
                                     </div>
-                                    <div className="w-64 space-y-1">
-                                       <div className="flex justify-between items-center pt-1"><span className="text-[11px] font-black uppercase text-black tracking-widest">Grand Total</span><span className="text-lg font-black text-black tracking-tighter leading-none">{formatMoney(total)}</span></div>
-                                    </div>
+                                    <div className="space-y-1 ml-auto">
+                                        <div className="flex items-baseline justify-end gap-6 pt-1">
+                                           <span className="text-xs font-black uppercase text-black tracking-widest whitespace-nowrap">Grand Total</span>
+                                           <span className="text-xl font-black text-black tracking-tight leading-none whitespace-nowrap">{formatMoney(total)}</span>
+                                        </div>
+                                     </div>
                                  </div>
                               </div>
                            </div>

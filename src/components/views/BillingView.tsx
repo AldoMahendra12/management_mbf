@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { toPng } from 'html-to-image';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -388,31 +388,21 @@ export function BillingView() {
       // ── 1. Inline semua gambar ke Base64 agar 100% bebas CORS ───────
       await inlineAllImages(targetElement);
 
-      // ── 2. Render HTML ke Canvas ────────────────────────────────────
-      const canvas = await html2canvas(targetElement, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
+      // ── 2. Render HTML ke Image (Native Browser SVG ForeignObject) ──
+      // 100% mendukung oklch, CSS modern, Tailwind v4 tanpa error!
+      const imgData = await toPng(targetElement, {
+        quality: 0.98,
+        pixelRatio: 2,
         backgroundColor: '#ffffff',
-        logging: false,
-        imageTimeout: 10000,
-        onclone: (_, clonedEl) => {
-          clonedEl.style.transform = 'none';
-        }
+        cacheBust: true,
       });
-
-      let imgData = '';
-      try {
-        imgData = canvas.toDataURL('image/png');
-      } catch (canvasErr) {
-        // Fallback jika PNG gagal
-        imgData = canvas.toDataURL('image/jpeg', 0.95);
-      }
 
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
-      const ratio = canvas.width / canvas.height;
+      const elWidth = targetElement.offsetWidth || 800;
+      const elHeight = targetElement.offsetHeight || 500;
+      const ratio = elWidth / elHeight;
       let imgW = pageWidth;
       let imgH = pageWidth / ratio;
       if (imgH > pageHeight) {

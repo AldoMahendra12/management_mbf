@@ -385,31 +385,38 @@ export function BillingView() {
       // ── 1. Inline semua gambar ke Base64 agar bebas CORS ────────────
       await inlineAllImages(targetElement);
 
-      // ── 2. Render HTML ke Image secara instan tanpa delay ───────────
-      // skipFonts: true mencegah browser hang/stuck menunggu pemindaian stylesheet
-      const imgData = await toPng(targetElement, {
-        quality: 0.95,
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-        skipFonts: true,
-      });
+      // ── 2. Render HTML ke Image secara bersih & rapi ───────────────
+      // Hilangkan sementara border, shadow, dan rounded agar hasil PDF murni berupa dokumen faktur resmi, bukan screenshot kartu
+      const prevShadow = targetElement.style.boxShadow;
+      const prevRadius = targetElement.style.borderRadius;
+      const prevBorder = targetElement.style.border;
 
-      // ── 3. Generate dan otomatis download PDF ───────────────────────
-      const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const elWidth = targetElement.offsetWidth || 800;
-      const elHeight = targetElement.offsetHeight || 500;
-      const ratio = elWidth / elHeight;
-      let imgW = pageWidth;
-      let imgH = pageWidth / ratio;
-      if (imgH > pageHeight) {
-        imgH = pageHeight;
-        imgW = pageHeight * ratio;
+      targetElement.style.boxShadow = 'none';
+      targetElement.style.borderRadius = '0px';
+      targetElement.style.border = 'none';
+
+      let imgData = '';
+      try {
+        imgData = await toPng(targetElement, {
+          quality: 0.98,
+          pixelRatio: 2.5,
+          backgroundColor: '#ffffff',
+          skipFonts: true,
+        });
+      } finally {
+        targetElement.style.boxShadow = prevShadow;
+        targetElement.style.borderRadius = prevRadius;
+        targetElement.style.border = prevBorder;
       }
-      const offsetX = (pageWidth - imgW) / 2;
-      const offsetY = (pageHeight - imgH) / 2;
-      pdf.addImage(imgData, 'PNG', offsetX, offsetY, imgW, imgH);
+
+      // ── 3. Generate PDF Full-Bleed 1 Halaman Pas Dokumen (9.5 x 5.5 inch) ──
+      // Menghasilkan dokumen invoice pas 1 halaman penuh tanpa margin hitam/kosong di sekitarnya
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'in',
+        format: [9.5, 5.5]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, 9.5, 5.5, undefined, 'FAST');
 
       const safeCustomer = customerName.replace(/[^a-zA-Z0-9]/g, '-');
       const fileName = `Invoice-${companyShort}-${safeCustomer}-${code}.pdf`;

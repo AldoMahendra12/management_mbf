@@ -385,20 +385,55 @@ export function BillingView() {
       // ── 1. Inline semua gambar ke Base64 agar bebas CORS ────────────
       await inlineAllImages(targetElement);
 
-      // ── 2. Render HTML ke Image (Persis 100% Sama dengan Preview di Layar) ──
+      // ── 2. Embed font Inter sebagai Base64 agar PDF hasil toPng identik dengan preview ──
+      // Inject font Inter langsung ke element agar html-to-image bisa embed dengan benar
+      let fontStyleTag: HTMLStyleElement | null = null;
+      try {
+        const fontUrls = [
+          'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2',
+        ];
+        const fontBase64Parts: string[] = [];
+        for (const url of fontUrls) {
+          try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+            const b64 = await new Promise<string>((resolve) => {
+              const r = new FileReader();
+              r.onloadend = () => resolve(r.result as string);
+              r.readAsDataURL(blob);
+            });
+            fontBase64Parts.push(`@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; src: url('${b64}') format('woff2'); }`);
+          } catch (_e) { /* skip if fetch fails */ }
+        }
+        if (fontBase64Parts.length > 0) {
+          fontStyleTag = document.createElement('style');
+          fontStyleTag.textContent = fontBase64Parts.join('\n');
+          targetElement.appendChild(fontStyleTag);
+          // Tunggu sebentar agar font ter-load sebelum capture
+          await new Promise(r => setTimeout(r, 200));
+        }
+      } catch (_fontErr) { /* lanjutkan tanpa embed font jika error */ }
+
+      // ── 3. Render HTML ke Image (Persis 100% Sama dengan Preview di Layar) ──
       // Gunakan dimensi aktual yang lega agar tidak mepet
       const actualWidth = targetElement.scrollWidth || targetElement.offsetWidth || 912;
       const actualHeight = targetElement.scrollHeight || targetElement.offsetHeight || 528;
 
-      // Render dengan font asli aplikasi (tanpa skipFonts agar font Inter / font-black ter-embed sempurna)
+      // Render dengan font asli aplikasi (tanpa skipFonts agar font Inter ter-embed sempurna)
       const imgData = await toPng(targetElement, {
         width: actualWidth,
         height: actualHeight,
         quality: 1,
         pixelRatio: 3, // Resolusi Ultra-HD super tajam
         backgroundColor: '#ffffff',
-        cacheBust: true,
+        cacheBust: false,
+        includeQueryParams: true,
       });
+
+      // Bersihkan style tag font yang sudah di-inject
+      if (fontStyleTag && targetElement.contains(fontStyleTag)) {
+        targetElement.removeChild(fontStyleTag);
+      }
 
       // ── 3. Generate PDF Dokumen Pas Proporsional Seperti Kartu Preview ──
       // Ukuran faktur landscape 9.5in (241.3mm) x proporsional tinggi aktual
@@ -860,25 +895,25 @@ _${companyName}_`;
                                     <div className="flex gap-4 items-center">
                                        <img src={logoBEF} alt="BEF" crossOrigin="anonymous" className="w-16 h-16 object-contain" />
                                        <div>
-                                          <h1 className="text-xl font-black tracking-tighter text-black uppercase">CV BERKAH EGG FARM</h1>
+                                          <h1 className="text-xl font-bold tracking-tighter text-black uppercase">CV BERKAH EGG FARM</h1>
                                           <p className="text-[10px] font-bold text-black uppercase tracking-widest leading-tight">Pengepul & Supplier Telur Ayam<br/>Tulungagung, Jawa Timur</p>
                                        </div>
                                     </div>
                                     <div className="text-right">
-                                       <h2 className="text-2xl font-black text-black tracking-tighter uppercase leading-none">INVOICE</h2>
-                                       <p className="text-xs font-black text-black mt-1 uppercase tracking-widest">{invDisplay}</p>
+                                       <h2 className="text-2xl font-bold text-black tracking-tighter uppercase leading-none">INVOICE</h2>
+                                       <p className="text-xs font-bold text-black mt-1 uppercase tracking-widest">{invDisplay}</p>
                                     </div>
                                  </div>
 
                                  <div className="grid grid-cols-2 gap-10">
                                     <div className="space-y-1">
-                                       <p className="text-[9px] font-black text-black uppercase tracking-widest">Kepada Yth:</p>
-                                       <p className="text-sm font-black text-black uppercase">{customer}</p>
+                                       <p className="text-[9px] font-bold text-black uppercase tracking-widest">Kepada Yth:</p>
+                                       <p className="text-sm font-bold text-black uppercase">{customer}</p>
                                        <p className="text-[9px] font-bold text-black uppercase tracking-tight italic">Pelanggan Setia CV. Berkah Egg Farm</p>
                                     </div>
                                     <div className="text-right">
-                                       <p className="text-[9px] font-black text-black uppercase tracking-widest">Tanggal</p>
-                                       <p className="text-[11px] font-black text-black">{dateStr}</p>
+                                       <p className="text-[9px] font-bold text-black uppercase tracking-widest">Tanggal</p>
+                                       <p className="text-[11px] font-bold text-black">{dateStr}</p>
                                     </div>
                                  </div>
 
@@ -886,10 +921,10 @@ _${companyName}_`;
                                     <table className="w-full border-collapse">
                                        <thead>
                                           <tr className="border-b-2 border-black">
-                                             <th className="text-left py-2 text-[10px] font-black uppercase tracking-widest text-black">Keterangan Produk</th>
-                                             <th className="text-right py-2 text-[10px] font-black uppercase tracking-widest text-black w-24">Jumlah</th>
-                                             <th className="text-right py-2 text-[10px] font-black uppercase tracking-widest text-black w-28">Harga</th>
-                                             <th className="text-right py-2 text-[10px] font-black uppercase tracking-widest text-black w-28">Total</th>
+                                             <th className="text-left py-2 text-[10px] font-bold uppercase tracking-widest text-black">Keterangan Produk</th>
+                                             <th className="text-right py-2 text-[10px] font-bold uppercase tracking-widest text-black w-24">Jumlah</th>
+                                             <th className="text-right py-2 text-[10px] font-bold uppercase tracking-widest text-black w-28">Harga</th>
+                                             <th className="text-right py-2 text-[10px] font-bold uppercase tracking-widest text-black w-28">Total</th>
                                           </tr>
                                        </thead>
                                        <tbody className="divide-y divide-slate-100">
@@ -905,13 +940,13 @@ _${companyName}_`;
                                                       const itemName = `${item.type}${item.grade ? ` - ${item.grade}` : ''}`;
                                                       return (
                                                          <tr key={idx}>
-                                                            <td className="py-3 text-xs font-black text-black uppercase">
+                                                            <td className="py-3 text-xs font-bold text-black uppercase">
                                                                {itemName}
                                                                {item.notes && <span className="block text-[10px] text-black/60 normal-case font-bold mt-0.5">{item.notes}</span>}
                                                             </td>
-                                                            <td className="py-3 text-right text-xs font-black text-black">{item.qty.toLocaleString('id-ID')} {unit}</td>
-                                                            <td className="py-3 text-right text-xs font-black text-black">{formatMoney(item.price)}</td>
-                                                            <td className="py-3 text-right text-xs font-black text-black">{formatMoney(item.qty * item.price)}</td>
+                                                            <td className="py-3 text-right text-xs font-bold text-black">{item.qty.toLocaleString('id-ID')} {unit}</td>
+                                                            <td className="py-3 text-right text-xs font-bold text-black">{formatMoney(item.price)}</td>
+                                                            <td className="py-3 text-right text-xs font-bold text-black">{formatMoney(item.qty * item.price)}</td>
                                                          </tr>
                                                       );
                                                    });
@@ -936,13 +971,13 @@ _${companyName}_`;
 
                                              return (
                                                 <tr>
-                                                   <td className="py-3 text-xs font-black text-black uppercase">
+                                                   <td className="py-3 text-xs font-bold text-black uppercase">
                                                       {itemName}
                                                       {ketPart && <span className="block text-[10px] text-black/60 normal-case font-bold mt-0.5">{ketPart.replace('Ket:', '').trim()}</span>}
                                                    </td>
-                                                   <td className="py-3 text-right text-xs font-black text-black">{(activeInvoice.jumlah_kg || activeInvoice.total_kg || 0).toLocaleString('id-ID')} {unit}</td>
-                                                   <td className="py-3 text-right text-xs font-black text-black">{formatMoney(activeInvoice.harga_per_kg || 0)}</td>
-                                                   <td className="py-3 text-right text-xs font-black text-black">{formatMoney(total)}</td>
+                                                   <td className="py-3 text-right text-xs font-bold text-black">{(activeInvoice.jumlah_kg || activeInvoice.total_kg || 0).toLocaleString('id-ID')} {unit}</td>
+                                                   <td className="py-3 text-right text-xs font-bold text-black">{formatMoney(activeInvoice.harga_per_kg || 0)}</td>
+                                                   <td className="py-3 text-right text-xs font-bold text-black">{formatMoney(total)}</td>
                                                 </tr>
                                              );
                                           })()}
@@ -953,14 +988,14 @@ _${companyName}_`;
                                  <div className="flex justify-between items-end gap-4 mt-auto">
                                     <div className="flex gap-16 text-center">
                                        <div className="space-y-4">
-                                          <p className="text-[9px] font-black uppercase tracking-widest text-black">Hormat Kami</p>
+                                          <p className="text-[9px] font-bold uppercase tracking-widest text-black">Hormat Kami</p>
                                           <div className="w-24 border-b border-black mx-auto" />
                                        </div>
                                     </div>
                                     <div className="space-y-1 ml-auto">
                                         <div className="flex items-baseline justify-end gap-6 pt-1">
-                                           <span className="text-xs font-black uppercase text-black tracking-widest whitespace-nowrap">Grand Total</span>
-                                           <span className="text-xl font-black text-black tracking-tight leading-none whitespace-nowrap">{formatMoney(total)}</span>
+                                           <span className="text-xs font-bold uppercase text-black tracking-widest whitespace-nowrap">Grand Total</span>
+                                           <span className="text-xl font-bold text-black tracking-tight leading-none whitespace-nowrap">{formatMoney(total)}</span>
                                         </div>
                                      </div>
                                  </div>
@@ -1254,25 +1289,25 @@ _${companyName}_`;
                                      <div className="flex gap-4 items-center">
                                         <img src={logoMBF} alt="MBF" crossOrigin="anonymous" className="w-16 h-16 object-contain" />
                                         <div>
-                                           <h1 className="text-xl font-black tracking-tighter text-black uppercase">PT. MITRA BAROKAH FARM</h1>
+                                           <h1 className="text-xl font-bold tracking-tighter text-black uppercase">PT. MITRA BAROKAH FARM</h1>
                                            <p className="text-[10px] font-bold text-black uppercase tracking-widest leading-tight">Divisi Distribusi Pakan Ternak<br/>Tulungagung, Jawa Timur</p>
                                         </div>
                                      </div>
                                      <div className="text-right">
-                                        <h2 className="text-2xl font-black text-black tracking-tighter uppercase leading-none">NOTA PENJUALAN</h2>
-                                        <p className="text-xs font-black text-black mt-1 uppercase tracking-widest">{invDisplay}</p>
+                                        <h2 className="text-2xl font-bold text-black tracking-tighter uppercase leading-none">NOTA PENJUALAN</h2>
+                                        <p className="text-xs font-bold text-black mt-1 uppercase tracking-widest">{invDisplay}</p>
                                      </div>
                                   </div>
                                   
                                   <div className="grid grid-cols-2 gap-10">
                                      <div className="space-y-1 text-left">
-                                        <p className="text-[9px] font-black text-black uppercase tracking-widest">Kepada Yth:</p>
-                                        <p className="text-sm font-black text-black uppercase">{customer}</p>
+                                        <p className="text-[9px] font-bold text-black uppercase tracking-widest">Kepada Yth:</p>
+                                        <p className="text-sm font-bold text-black uppercase">{customer}</p>
                                         <p className="text-[9px] font-bold text-black uppercase tracking-tight italic opacity-70">Pelanggan Setia PT. Mitra Barokah Farm</p>
                                      </div>
                                      <div className="text-right">
-                                        <p className="text-[9px] font-black text-black uppercase tracking-widest">Tanggal</p>
-                                        <p className="text-[11px] font-black text-black">{dateStr}</p>
+                                        <p className="text-[9px] font-bold text-black uppercase tracking-widest">Tanggal</p>
+                                        <p className="text-[11px] font-bold text-black">{dateStr}</p>
                                      </div>
                                   </div>
 
@@ -1280,10 +1315,10 @@ _${companyName}_`;
                                     <table className="w-full border-collapse">
                                        <thead>
                                           <tr className="border-b-2 border-black">
-                                             <th className="text-left py-2 text-[10px] font-black uppercase tracking-widest text-black">Keterangan Produk</th>
-                                             <th className="text-right py-2 text-[10px] font-black uppercase tracking-widest text-black w-24">Qty</th>
-                                             <th className="text-right py-2 text-[10px] font-black uppercase tracking-widest text-black w-32">Harga Satuan</th>
-                                             <th className="text-right py-2 text-[10px] font-black uppercase tracking-widest text-black w-32">Total</th>
+                                             <th className="text-left py-2 text-[10px] font-bold uppercase tracking-widest text-black">Keterangan Produk</th>
+                                             <th className="text-right py-2 text-[10px] font-bold uppercase tracking-widest text-black w-24">Qty</th>
+                                             <th className="text-right py-2 text-[10px] font-bold uppercase tracking-widest text-black w-32">Harga Satuan</th>
+                                             <th className="text-right py-2 text-[10px] font-bold uppercase tracking-widest text-black w-32">Total</th>
                                           </tr>
                                        </thead>
                                        <tbody className="divide-y divide-slate-100">
@@ -1293,18 +1328,18 @@ _${companyName}_`;
                                              const itemSatuan = itemMaster?.satuan || det.satuan || 'kg';
                                              return (
                                                 <tr key={di}>
-                                                   <td className="py-2 text-xs font-black text-black uppercase">{itemName}</td>
-                                                   <td className="py-2 text-right text-xs font-black text-black">{(det.qty || det.quantity || 0).toLocaleString('id-ID')} {itemSatuan}</td>
-                                                   <td className="py-2 text-right text-xs font-black text-black">{formatMoney(det.harga_per_satuan || det.harga_satuan || 0)}/{itemSatuan}</td>
-                                                   <td className="py-2 text-right text-xs font-black text-black">{formatMoney((det.qty || det.quantity || 0) * (det.harga_per_satuan || det.harga_satuan || 0))}</td>
+                                                   <td className="py-2 text-xs font-bold text-black uppercase">{itemName}</td>
+                                                   <td className="py-2 text-right text-xs font-bold text-black">{(det.qty || det.quantity || 0).toLocaleString('id-ID')} {itemSatuan}</td>
+                                                   <td className="py-2 text-right text-xs font-bold text-black">{formatMoney(det.harga_per_satuan || det.harga_satuan || 0)}/{itemSatuan}</td>
+                                                   <td className="py-2 text-right text-xs font-bold text-black">{formatMoney((det.qty || det.quantity || 0) * (det.harga_per_satuan || det.harga_satuan || 0))}</td>
                                                 </tr>
                                              );
                                           }) : (
                                              <tr>
-                                                <td className="py-3 text-xs font-black text-black uppercase">Pakan Ternak Konsentrat (Bulk)</td>
-                                                <td className="py-3 text-right text-xs font-black text-black">1 Unit</td>
-                                                <td className="py-3 text-right text-xs font-black text-black">{formatMoney(total)}</td>
-                                                <td className="py-3 text-right text-xs font-black text-black">{formatMoney(total)}</td>
+                                                <td className="py-3 text-xs font-bold text-black uppercase">Pakan Ternak Konsentrat (Bulk)</td>
+                                                <td className="py-3 text-right text-xs font-bold text-black">1 Unit</td>
+                                                <td className="py-3 text-right text-xs font-bold text-black">{formatMoney(total)}</td>
+                                                <td className="py-3 text-right text-xs font-bold text-black">{formatMoney(total)}</td>
                                              </tr>
                                           )}
                                        </tbody>
@@ -1314,18 +1349,18 @@ _${companyName}_`;
                                  <div className="flex justify-between items-end gap-4 mt-auto">
                                     <div className="flex gap-16 text-center">
                                        <div className="space-y-4">
-                                          <p className="text-[9px] font-black uppercase tracking-widest text-black">Dikirimkan,</p>
-                                          <div className="pt-4"><div className="w-32 border-b border-black mx-auto" /><p className="text-[9px] font-black uppercase tracking-widest text-black mt-1">Pengemudi</p></div>
+                                          <p className="text-[9px] font-bold uppercase tracking-widest text-black">Dikirimkan,</p>
+                                          <div className="pt-4"><div className="w-32 border-b border-black mx-auto" /><p className="text-[9px] font-bold uppercase tracking-widest text-black mt-1">Pengemudi</p></div>
                                        </div>
                                        <div className="space-y-4">
-                                          <p className="text-[9px] font-black uppercase tracking-widest text-black">Diterima,</p>
-                                          <div className="pt-4"><div className="w-32 border-b border-black mx-auto" /><p className="text-[9px] font-black uppercase tracking-widest text-black mt-1">Pelanggan</p></div>
+                                          <p className="text-[9px] font-bold uppercase tracking-widest text-black">Diterima,</p>
+                                          <div className="pt-4"><div className="w-32 border-b border-black mx-auto" /><p className="text-[9px] font-bold uppercase tracking-widest text-black mt-1">Pelanggan</p></div>
                                        </div>
                                     </div>
                                     <div className="space-y-1 ml-auto">
                                         <div className="flex items-baseline justify-end gap-6 pt-1">
-                                           <span className="text-xs font-black uppercase text-black tracking-widest whitespace-nowrap">Grand Total</span>
-                                           <span className="text-xl font-black text-black tracking-tight leading-none whitespace-nowrap">{formatMoney(total)}</span>
+                                           <span className="text-xs font-bold uppercase text-black tracking-widest whitespace-nowrap">Grand Total</span>
+                                           <span className="text-xl font-bold text-black tracking-tight leading-none whitespace-nowrap">{formatMoney(total)}</span>
                                         </div>
                                      </div>
                                  </div>

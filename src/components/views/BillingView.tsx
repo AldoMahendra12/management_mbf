@@ -414,29 +414,43 @@ export function BillingView() {
         }
       } catch (_fontErr) { /* lanjutkan tanpa embed font jika error */ }
 
-      // ── 3. Render HTML ke Image (Persis 100% Sama dengan Preview di Layar) ──
-      // Gunakan dimensi aktual yang lega agar tidak mepet
-      const actualWidth = targetElement.scrollWidth || targetElement.offsetWidth || 912;
-      const actualHeight = targetElement.scrollHeight || targetElement.offsetHeight || 528;
+      // ── 3. Render HTML ke Image (Persis 100% Simetris Tanpa Geser/Miring) ──
+      const rect = targetElement.getBoundingClientRect();
+      const actualWidth = Math.ceil(rect.width) || targetElement.offsetWidth || 912;
+      const actualHeight = Math.ceil(rect.height) || targetElement.offsetHeight || 528;
 
-      // Render dengan font asli aplikasi (tanpa skipFonts agar font Inter ter-embed sempurna)
-      const imgData = await toPng(targetElement, {
-        width: actualWidth,
-        height: actualHeight,
-        quality: 1,
-        pixelRatio: 3, // Resolusi Ultra-HD super tajam
-        backgroundColor: '#ffffff',
-        cacheBust: false,
-        includeQueryParams: true,
-      });
+      // Simpan style sementara agar capture bersih tanpa margin offset
+      const originalMargin = targetElement.style.margin;
+      const originalTransform = targetElement.style.transform;
+      targetElement.style.margin = '0px';
+      targetElement.style.transform = 'none';
+
+      let imgData = '';
+      try {
+        imgData = await toPng(targetElement, {
+          width: actualWidth,
+          height: actualHeight,
+          quality: 1,
+          pixelRatio: 3, // Resolusi Ultra-HD super tajam
+          backgroundColor: '#ffffff',
+          cacheBust: false,
+          includeQueryParams: true,
+          style: {
+            margin: '0',
+            transform: 'none',
+          }
+        });
+      } finally {
+        targetElement.style.margin = originalMargin;
+        targetElement.style.transform = originalTransform;
+      }
 
       // Bersihkan style tag font yang sudah di-inject
       if (fontStyleTag && targetElement.contains(fontStyleTag)) {
         targetElement.removeChild(fontStyleTag);
       }
 
-      // ── 3. Generate PDF Dokumen Pas Proporsional Seperti Kartu Preview ──
-      // Ukuran faktur landscape 9.5in (241.3mm) x proporsional tinggi aktual
+      // ── 4. Generate PDF Dokumen Pas Proporsional Sesuai Dimensi Elemen ──
       const pdfWidthMm = 241.3;
       const pdfHeightMm = (actualHeight / actualWidth) * pdfWidthMm;
 
@@ -446,7 +460,6 @@ export function BillingView() {
         format: [pdfWidthMm, pdfHeightMm]
       });
 
-      // Tampilkan kartu invoice pas memenuhi halaman PDF persis seperti preview
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidthMm, pdfHeightMm, undefined, 'FAST');
 
       const safeCustomer = customerName.replace(/[^a-zA-Z0-9]/g, '-');

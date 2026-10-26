@@ -385,38 +385,63 @@ export function BillingView() {
       // ── 1. Inline semua gambar ke Base64 agar bebas CORS ────────────
       await inlineAllImages(targetElement);
 
-      // ── 2. Render HTML ke Image secara bersih & rapi ───────────────
-      // Hilangkan sementara border, shadow, dan rounded agar hasil PDF murni berupa dokumen faktur resmi, bukan screenshot kartu
+      // ── 2. Render HTML ke Image secara proporsional tanpa terpotong ──
+      // Simpan styling asli
       const prevShadow = targetElement.style.boxShadow;
       const prevRadius = targetElement.style.borderRadius;
       const prevBorder = targetElement.style.border;
+      const prevOverflow = targetElement.style.overflow;
+      const prevHeight = targetElement.style.height;
 
+      // Bersihkan batas agar tidak terpotong tepi kanan dan bawah
       targetElement.style.boxShadow = 'none';
       targetElement.style.borderRadius = '0px';
       targetElement.style.border = 'none';
+      targetElement.style.overflow = 'visible';
+      targetElement.style.height = 'auto';
+
+      const actualWidth = targetElement.scrollWidth || targetElement.offsetWidth || 912;
+      const actualHeight = targetElement.scrollHeight || targetElement.offsetHeight || 528;
 
       let imgData = '';
       try {
         imgData = await toPng(targetElement, {
+          width: actualWidth,
+          height: actualHeight,
           quality: 0.98,
           pixelRatio: 2.5,
           backgroundColor: '#ffffff',
           skipFonts: true,
         });
       } finally {
+        // Kembalikan styling semula
         targetElement.style.boxShadow = prevShadow;
         targetElement.style.borderRadius = prevRadius;
         targetElement.style.border = prevBorder;
+        targetElement.style.overflow = prevOverflow;
+        targetElement.style.height = prevHeight;
       }
 
-      // ── 3. Generate PDF Full-Bleed 1 Halaman Pas Dokumen (9.5 x 5.5 inch) ──
-      // Menghasilkan dokumen invoice pas 1 halaman penuh tanpa margin hitam/kosong di sekitarnya
+      // ── 3. Generate PDF dengan Margin Presisi Simetris (Tidak Ada yang Terpotong) ──
+      // Standar ukuran faktur landscape continuous 9.5in x 5.5in (241.3mm x 139.7mm)
+      const pdfWidthMm = 241.3;
+      const calculatedHeightMm = (actualHeight / actualWidth) * pdfWidthMm;
+      const pdfHeightMm = Math.max(139.7, calculatedHeightMm);
+
       const pdf = new jsPDF({
         orientation: 'landscape',
-        unit: 'in',
-        format: [9.5, 5.5]
+        unit: 'mm',
+        format: [pdfWidthMm, pdfHeightMm]
       });
-      pdf.addImage(imgData, 'PNG', 0, 0, 9.5, 5.5, undefined, 'FAST');
+
+      // Beri margin pengaman 5mm di semua sisi agar tidak ada teks tepi yang terpotong
+      const marginMm = 5;
+      const drawWidthMm = pdfWidthMm - (marginMm * 2);
+      const drawHeightMm = (actualHeight / actualWidth) * drawWidthMm;
+      const posX = marginMm;
+      const posY = Math.max(marginMm, (pdfHeightMm - drawHeightMm) / 2);
+
+      pdf.addImage(imgData, 'PNG', posX, posY, drawWidthMm, drawHeightMm, undefined, 'FAST');
 
       const safeCustomer = customerName.replace(/[^a-zA-Z0-9]/g, '-');
       const fileName = `Invoice-${companyShort}-${safeCustomer}-${code}.pdf`;
@@ -854,7 +879,7 @@ _${companyName}_`;
                     return (
                       <div className="flex flex-col gap-4">
                          <div ref={printRefTelur} className="print:m-0 print:p-0 flex justify-center print:block">
-                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout">
+                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-8 flex flex-col relative border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout">
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
                                   <img src={logoBEF} alt="" crossOrigin="anonymous" className="w-[60%] h-auto object-contain" />
                                </div>
@@ -1248,7 +1273,7 @@ _${companyName}_`;
                     return (
                       <div className="flex flex-col gap-4">
                          <div ref={printRefPakan} className="print:m-0 print:p-0 flex justify-center print:block">
-                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-4 flex flex-col relative overflow-hidden border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout">
+                            <div className="w-full max-w-[9.5in] h-[5.5in] mx-auto bg-white text-black px-10 pt-8 pb-8 flex flex-col relative border border-slate-200 shadow-md print:border-none print:shadow-none print:rounded-none rounded-xl print:w-[9.5in] print:h-[5.5in] invoice-print-layout">
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
                                   <img src={logoMBF} alt="" crossOrigin="anonymous" className="w-[60%] h-auto object-contain" />
                                </div>

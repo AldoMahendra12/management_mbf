@@ -292,13 +292,18 @@ export function BillingView() {
    * Helper untuk mengonversi gambar di dalam invoice menjadi Data URL (Base64)
    * agar html2canvas 100% bebas dari isu CORS & Tainted Canvas di semua browser/Vercel.
    */
+  const imgCacheRef = useRef<Record<string, string>>({});
+
   const inlineAllImages = async (container: HTMLElement) => {
     const images = Array.from(container.getElementsByTagName('img'));
     await Promise.all(
       images.map(async (img) => {
         if (!img.src || img.src.startsWith('data:')) return;
+        if (imgCacheRef.current[img.src]) {
+          img.src = imgCacheRef.current[img.src];
+          return;
+        }
         try {
-          // 1. Coba lewat canvas lokal jika gambar sudah ter-decode
           if (img.complete && img.naturalWidth > 0) {
             try {
               const c = document.createElement('canvas');
@@ -309,16 +314,13 @@ export function BillingView() {
                 ctx.drawImage(img, 0, 0);
                 const data = c.toDataURL('image/png');
                 if (data && data.length > 100) {
+                  imgCacheRef.current[img.src] = data;
                   img.src = data;
                   return;
                 }
               }
-            } catch (err) {
-              // Jika canvas lokal tainted, lanjut ke fetch blob
-            }
+            } catch (err) {}
           }
-
-          // 2. Fetch blob dan baca dengan FileReader
           const res = await fetch(img.src);
           const blob = await res.blob();
           const base64 = await new Promise<string>((resolve, reject) => {
@@ -327,9 +329,12 @@ export function BillingView() {
             reader.onerror = reject;
             reader.readAsDataURL(blob);
           });
-          if (base64) img.src = base64;
+          if (base64) {
+            imgCacheRef.current[img.src] = base64;
+            img.src = base64;
+          }
         } catch (e) {
-          console.warn('Gagal inline image, tetap melanjutkan render:', e);
+          console.warn('Gagal inline image:', e);
         }
       })
     );
@@ -349,14 +354,6 @@ export function BillingView() {
     if (!targetElement) {
       alert('Silakan klik ikon file (📄) pada baris invoice terlebih dahulu agar preview invoice muncul.');
       return;
-    }
-
-    // Buka tab WhatsApp di awal untuk mencegah diblokir oleh popup blocker browser
-    let waWindow = null;
-    try {
-      waWindow = window.open('about:blank', '_blank');
-    } catch (e) {
-      // Abaikan jika browser memblokir popup
     }
 
     setIsGeneratingPdf(true);
@@ -385,18 +382,19 @@ export function BillingView() {
       const total = Number(invoice.total_tagihan || invoice.total_harga || 0);
       const diff = total - getPaid(invoice);
 
-      // ── 1. Inline semua gambar ke Base64 agar 100% bebas CORS ───────
+      // ── 1. Inline semua gambar ke Base64 agar bebas CORS ────────────
       await inlineAllImages(targetElement);
 
-      // ── 2. Render HTML ke Image (Native Browser SVG ForeignObject) ──
-      // 100% mendukung oklch, CSS modern, Tailwind v4 tanpa error!
+      // ── 2. Render HTML ke Image secara instan tanpa delay ───────────
+      // skipFonts: true mencegah browser hang/stuck menunggu pemindaian stylesheet
       const imgData = await toPng(targetElement, {
-        quality: 0.98,
+        quality: 0.95,
         pixelRatio: 2,
         backgroundColor: '#ffffff',
-        cacheBust: true,
+        skipFonts: true,
       });
 
+      // ── 3. Generate dan otomatis download PDF ───────────────────────
       const pdf = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
@@ -417,7 +415,7 @@ export function BillingView() {
       const fileName = `Invoice-${companyShort}-${safeCustomer}-${code}.pdf`;
       pdf.save(fileName);
 
-      // ── 3. Buka WhatsApp dengan teks pembuka ─────────────────────────
+      // ── 4. Langsung buka WhatsApp dengan teks pembuka resmi ─────────
       const dateLine = formattedDate ? `, tanggal *${formattedDate}*` : '';
       const waText =
 `Halo Bapak/Ibu *${customerName}* 👋
@@ -433,17 +431,20 @@ Terima kasih atas kepercayaan dan kerja samanya 🙏
 _${companyName}_`;
 
       const targetWaUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`;
-      if (waWindow && !waWindow.closed) {
-        waWindow.location.href = targetWaUrl;
-      } else {
-        window.open(targetWaUrl, '_blank');
+      
+      // Buka WA langsung di tab baru tanpa harus switch tab
+      const waTab = window.open(targetWaUrl, '_blank');
+      if (!waTab) {
+        const link = document.createElement('a');
+        link.href = targetWaUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Gagal generate PDF:', err);
-      // Tutup tab kosong jika ada
-      if (waWindow && !waWindow.closed) {
-        waWindow.close();
-      }
       alert(`Gagal membuat PDF otomatis: ${err?.message || 'Terjadi kesalahan sistem'}.\nAnda tetap dapat mencetak ke PDF menggunakan tombol 'Cetak Invoice' lalu pilih 'Simpan sebagai PDF'.`);
     } finally {
       setIsGeneratingPdf(false);

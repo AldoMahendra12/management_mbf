@@ -40,6 +40,9 @@ const buildPrintStyles = (orientation: string, margin: string, scale: number) =>
 const printStyles = buildPrintStyles('landscape', '0', 100);
 
 
+// Cache Base64 font Inter agar tidak fetch berulang kali
+let cachedInterFontCss = '';
+
 export function BillingView() {
   const {
     billingMode,
@@ -290,22 +293,46 @@ export function BillingView() {
 
   /**
    * Helper untuk mengonversi gambar di dalam invoice menjadi Data URL (Base64)
-   * agar html2canvas 100% bebas dari isu CORS & Tainted Canvas di semua browser/Vercel.
+   * agar 100% bebas dari isu CORS & Tainted Canvas, dan watermark selalu muncul konsisten.
    */
   const imgCacheRef = useRef<Record<string, string>>({});
+
+  // Preload logo BEF dan MBF ke Base64 agar selalu instan & tidak pernah gagal/hilang
+  useEffect(() => {
+    const preloadImg = async (src: string) => {
+      if (!src || imgCacheRef.current[src]) return;
+      try {
+        const res = await fetch(src);
+        const blob = await res.blob();
+        const b64 = await new Promise<string>((resolve) => {
+          const r = new FileReader();
+          r.onloadend = () => resolve((r.result as string) || '');
+          r.readAsDataURL(blob);
+        });
+        if (b64) imgCacheRef.current[src] = b64;
+      } catch (e) {
+        console.warn('Preload logo error:', e);
+      }
+    };
+    preloadImg(logoBEF);
+    preloadImg(logoMBF);
+  }, []);
 
   const inlineAllImages = async (container: HTMLElement) => {
     const images = Array.from(container.getElementsByTagName('img'));
     await Promise.all(
       images.map(async (img) => {
-        if (!img.src || img.src.startsWith('data:')) return;
-        if (imgCacheRef.current[img.src]) {
-          img.src = imgCacheRef.current[img.src];
-          return;
+        const originalSrc = img.src;
+        if (!originalSrc) return;
+
+        let base64 = imgCacheRef.current[originalSrc];
+        if (!base64 && originalSrc.startsWith('data:')) {
+          base64 = originalSrc;
         }
-        try {
-          if (img.complete && img.naturalWidth > 0) {
-            try {
+
+        if (!base64) {
+          try {
+            if (img.complete && img.naturalWidth > 0) {
               const c = document.createElement('canvas');
               c.width = img.naturalWidth;
               c.height = img.naturalHeight;
@@ -314,30 +341,41 @@ export function BillingView() {
                 ctx.drawImage(img, 0, 0);
                 const data = c.toDataURL('image/png');
                 if (data && data.length > 100) {
-                  imgCacheRef.current[img.src] = data;
-                  img.src = data;
-                  return;
+                  base64 = data;
                 }
               }
-            } catch (err) {}
+            }
+          } catch (err) {}
+        }
+
+        if (!base64) {
+          try {
+            const res = await fetch(originalSrc);
+            const blob = await res.blob();
+            base64 = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onloadend = () => resolve((reader.result as string) || '');
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            });
+          } catch (e) {
+            console.warn('Gagal inline image:', e);
           }
-          const res = await fetch(img.src);
-          const blob = await res.blob();
-          const base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve((reader.result as string) || '');
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-          });
-          if (base64) {
-            imgCacheRef.current[img.src] = base64;
-            img.src = base64;
+        }
+
+        if (base64) {
+          imgCacheRef.current[originalSrc] = base64;
+          img.src = base64;
+          // KRUSIAL: Tunggu browser men-decode base64 agar bitmap watermark 100% siap di-render
+          if (img.decode) {
+            await img.decode().catch(() => {});
           }
-        } catch (e) {
-          console.warn('Gagal inline image:', e);
         }
       })
     );
+
+    // Berikan jeda sejenak agar rendering engine browser tuntas memproses bitmap
+    await new Promise((r) => setTimeout(r, 60));
   };
 
   /**
@@ -386,31 +424,34 @@ export function BillingView() {
       await inlineAllImages(targetElement);
 
       // ── 2. Embed font Inter sebagai Base64 agar PDF hasil toPng identik dengan preview ──
-      // Inject font Inter langsung ke element agar html-to-image bisa embed dengan benar
       let fontStyleTag: HTMLStyleElement | null = null;
       try {
-        const fontUrls = [
-          'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2',
-        ];
-        const fontBase64Parts: string[] = [];
-        for (const url of fontUrls) {
-          try {
-            const res = await fetch(url);
-            const blob = await res.blob();
-            const b64 = await new Promise<string>((resolve) => {
-              const r = new FileReader();
-              r.onloadend = () => resolve(r.result as string);
-              r.readAsDataURL(blob);
-            });
-            fontBase64Parts.push(`@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; src: url('${b64}') format('woff2'); }`);
-          } catch (_e) { /* skip if fetch fails */ }
+        if (!cachedInterFontCss) {
+          const fontUrls = [
+            'https://fonts.gstatic.com/s/inter/v13/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZ9hiJ-Ek-_EeA.woff2',
+          ];
+          const fontBase64Parts: string[] = [];
+          for (const url of fontUrls) {
+            try {
+              const res = await fetch(url);
+              const blob = await res.blob();
+              const b64 = await new Promise<string>((resolve) => {
+                const r = new FileReader();
+                r.onloadend = () => resolve(r.result as string);
+                r.readAsDataURL(blob);
+              });
+              fontBase64Parts.push(`@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; src: url('${b64}') format('woff2'); }`);
+            } catch (_e) { /* skip if fetch fails */ }
+          }
+          if (fontBase64Parts.length > 0) {
+            cachedInterFontCss = fontBase64Parts.join('\n');
+          }
         }
-        if (fontBase64Parts.length > 0) {
+        if (cachedInterFontCss) {
           fontStyleTag = document.createElement('style');
-          fontStyleTag.textContent = fontBase64Parts.join('\n');
+          fontStyleTag.textContent = cachedInterFontCss;
           targetElement.appendChild(fontStyleTag);
-          // Tunggu sebentar agar font ter-load sebelum capture
-          await new Promise(r => setTimeout(r, 200));
+          await new Promise(r => setTimeout(r, 100));
         }
       } catch (_fontErr) { /* lanjutkan tanpa embed font jika error */ }
 
@@ -900,13 +941,13 @@ _${companyName}_`;
                          <div ref={printRefTelur} className="print:m-0 print:p-0 flex justify-center print:block">
                             <div className="w-full max-w-[9.5in] min-h-[5.5in] h-auto mx-auto bg-white text-black px-10 pt-8 pb-12 flex flex-col relative border border-slate-200 shadow-sm print:border-none print:shadow-none print:rounded-none rounded-2xl print:w-[9.5in] print:min-h-[5.5in] invoice-print-layout" >
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
-                                  <img src={logoBEF} alt="" crossOrigin="anonymous" className="w-[60%] h-auto object-contain" />
+                                  <img src={logoBEF} alt="" className="w-[60%] h-auto object-contain" />
                                </div>
 
                                <div className="relative z-10 h-full w-full flex flex-col gap-4">
                                  <div className="flex justify-between items-center border-b-2 border-black pb-4">
                                     <div className="flex gap-4 items-center">
-                                       <img src={logoBEF} alt="BEF" crossOrigin="anonymous" className="w-16 h-16 object-contain" />
+                                       <img src={logoBEF} alt="BEF" className="w-16 h-16 object-contain" />
                                        <div>
                                           <h1 className="text-xl font-bold tracking-tighter text-black uppercase">CV BERKAH EGG FARM</h1>
                                           <p className="text-[10px] font-bold text-black uppercase tracking-widest leading-tight">Pengepul & Supplier Telur Ayam<br/>Tulungagung, Jawa Timur</p>
@@ -1294,13 +1335,13 @@ _${companyName}_`;
                          <div ref={printRefPakan} className="print:m-0 print:p-0 flex justify-center print:block">
                             <div className="w-full max-w-[9.5in] min-h-[5.5in] h-auto mx-auto bg-white text-black px-10 pt-8 pb-12 flex flex-col relative border border-slate-200 shadow-sm print:border-none print:shadow-none print:rounded-none rounded-2xl print:w-[9.5in] print:min-h-[5.5in] invoice-print-layout" >
                                <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
-                                  <img src={logoMBF} alt="" crossOrigin="anonymous" className="w-[60%] h-auto object-contain" />
+                                  <img src={logoMBF} alt="" className="w-[60%] h-auto object-contain" />
                                </div>
 
                                <div className="relative z-10 h-full w-full flex flex-col gap-4">
                                   <div className="flex justify-between items-center border-b-2 border-black pb-4">
                                      <div className="flex gap-4 items-center">
-                                        <img src={logoMBF} alt="MBF" crossOrigin="anonymous" className="w-16 h-16 object-contain" />
+                                        <img src={logoMBF} alt="MBF" className="w-16 h-16 object-contain" />
                                         <div>
                                            <h1 className="text-xl font-bold tracking-tighter text-black uppercase">PT. MITRA BAROKAH FARM</h1>
                                            <p className="text-[10px] font-bold text-black uppercase tracking-widest leading-tight">Divisi Distribusi Pakan Ternak<br/>Tulungagung, Jawa Timur</p>

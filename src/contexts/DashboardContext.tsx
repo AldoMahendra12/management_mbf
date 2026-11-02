@@ -398,6 +398,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
   const effectiveFeedItems = useMemo(() => {
     return feedItems.map(item => ({
       ...item,
+      is_archived: item.is_archived ?? ['PAR DOC', 'PAR G', 'Super 36'].includes(item.nama_bahan),
       stok_sekarang: (item.stok_sekarang || 0) + (sandboxFeedStockAdjustments[String(item.id)] || 0)
     }));
   }, [feedItems, sandboxFeedStockAdjustments]);
@@ -665,6 +666,7 @@ export const DashboardProvider = ({ children }: { children: ReactNode }) => {
       'mix sams': ['mix sams', 'mixsams'],
       '785-3': ['785-3', '7853', '758-3', '7583'],
       '785-2': ['785-2', '7852', '758-2', '7582'],
+      'piala spr tepung': ['piala spr tepung', 'piala spr', 'piala tepung', 'piala'],
     };
 
     // 1. Try exact match first

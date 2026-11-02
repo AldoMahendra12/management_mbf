@@ -162,7 +162,7 @@ export const FeedTransactionModal: React.FC = () => {
                           {isLoading ? (
                             <div className="h-10 w-full bg-slate-100 animate-pulse rounded-xl" />
                           ) : (
-                            feedItems.map((feed) => (
+                            feedItems.filter((feed: any) => !feed.is_archived).map((feed) => (
                               <button
                                 key={feed.id}
                                 type="button"

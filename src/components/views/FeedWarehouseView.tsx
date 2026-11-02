@@ -195,7 +195,7 @@ export function FeedWarehouseView() {
           </div>
         )}
         
-        {feedItems.map((card, i) => {
+        {feedItems.filter(card => !card.is_archived).map((card, i) => {
           const isMenipis = card.stok_sekarang <= (card.batas_minimum || 50);
           const isKritis = card.stok_sekarang <= (card.batas_minimum || 50) / 2;
           const statusText = isKritis ? 'Kritis' : isMenipis ? 'Menipis' : 'Aman';

@@ -142,7 +142,7 @@ export function DashboardView() {
     const list: any[] = [];
     
     // Critical feed alerts
-    feedItems?.forEach((item: any) => {
+    feedItems?.filter((item: any) => !item.is_archived).forEach((item: any) => {
       if (item.stok_sekarang <= (item.batas_minimum || 50)) {
         list.push({
           id: `feed-${item.id}`,

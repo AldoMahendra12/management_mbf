@@ -293,14 +293,38 @@ export function BillingView() {
 
   /**
    * Helper untuk mengonversi gambar di dalam invoice menjadi Data URL (Base64)
-   * agar 100% bebas dari isu CORS & Tainted Canvas, dan watermark selalu muncul konsisten.
+   * agar 100% bebas dari isu CORS & Tainted Canvas, dan watermark selalu muncul konsisten di semua browser (Chrome, Safari/MacBook, Firefox).
    */
   const imgCacheRef = useRef<Record<string, string>>({});
 
-  // Preload logo BEF dan MBF ke Base64 agar selalu instan & tidak pernah gagal/hilang
+  const saveToCache = (url: string, b64: string) => {
+    if (!url || !b64) return;
+    imgCacheRef.current[url] = b64;
+    try {
+      const absUrl = new URL(url, window.location.href).href;
+      imgCacheRef.current[absUrl] = b64;
+      const pathname = new URL(url, window.location.href).pathname;
+      imgCacheRef.current[pathname] = b64;
+    } catch (_) {}
+  };
+
+  const getFromCache = (url: string) => {
+    if (!url) return '';
+    if (url.startsWith('data:')) return url;
+    if (imgCacheRef.current[url]) return imgCacheRef.current[url];
+    try {
+      const absUrl = new URL(url, window.location.href).href;
+      if (imgCacheRef.current[absUrl]) return imgCacheRef.current[absUrl];
+      const pathname = new URL(url, window.location.href).pathname;
+      if (imgCacheRef.current[pathname]) return imgCacheRef.current[pathname];
+    } catch (_) {}
+    return '';
+  };
+
+  // Preload logo BEF dan MBF ke Base64 agar selalu instan & tidak pernah gagal/hilang di Safari/MacBook
   useEffect(() => {
     const preloadImg = async (src: string) => {
-      if (!src || imgCacheRef.current[src]) return;
+      if (!src || getFromCache(src)) return;
       try {
         const res = await fetch(src);
         const blob = await res.blob();
@@ -309,7 +333,7 @@ export function BillingView() {
           r.onloadend = () => resolve((r.result as string) || '');
           r.readAsDataURL(blob);
         });
-        if (b64) imgCacheRef.current[src] = b64;
+        if (b64) saveToCache(src, b64);
       } catch (e) {
         console.warn('Preload logo error:', e);
       }
@@ -325,10 +349,7 @@ export function BillingView() {
         const originalSrc = img.src;
         if (!originalSrc) return;
 
-        let base64 = imgCacheRef.current[originalSrc];
-        if (!base64 && originalSrc.startsWith('data:')) {
-          base64 = originalSrc;
-        }
+        let base64 = getFromCache(originalSrc);
 
         if (!base64) {
           try {
@@ -364,7 +385,7 @@ export function BillingView() {
         }
 
         if (base64) {
-          imgCacheRef.current[originalSrc] = base64;
+          saveToCache(originalSrc, base64);
           img.src = base64;
           // KRUSIAL: Tunggu browser men-decode base64 agar bitmap watermark 100% siap di-render
           if (img.decode) {
@@ -375,7 +396,7 @@ export function BillingView() {
     );
 
     // Berikan jeda sejenak agar rendering engine browser tuntas memproses bitmap
-    await new Promise((r) => setTimeout(r, 60));
+    await new Promise((r) => setTimeout(r, 80));
   };
 
   /**
@@ -468,7 +489,7 @@ export function BillingView() {
 
       let imgData = '';
       try {
-        imgData = await toPng(targetElement, {
+        const captureOptions = {
           width: actualWidth,
           height: actualHeight,
           quality: 1,
@@ -480,7 +501,15 @@ export function BillingView() {
             margin: '0',
             transform: 'none',
           }
-        });
+        };
+
+        // Pass 1: Warm-up pass untuk WebKit (Safari di MacBook / iOS / macOS)
+        // WebKit tidak merasterize nested images dalam SVG foreignObject pada pass pertama jika belum di-cache
+        await toPng(targetElement, captureOptions);
+        await new Promise((r) => setTimeout(r, 60));
+
+        // Pass 2: Final capture yang dijamin sudah memiliki watermark & aset 100% lengkap
+        imgData = await toPng(targetElement, captureOptions);
       } finally {
         targetElement.style.margin = originalMargin;
         targetElement.style.transform = originalTransform;
@@ -940,8 +969,8 @@ _${companyName}_`;
                       <div className="flex flex-col gap-4">
                          <div ref={printRefTelur} className="print:m-0 print:p-0 flex justify-center print:block">
                             <div className="w-full max-w-[9.5in] min-h-[5.5in] h-auto mx-auto bg-white text-black px-10 pt-8 pb-12 flex flex-col relative border border-slate-200 shadow-sm print:border-none print:shadow-none print:rounded-none rounded-2xl print:w-[9.5in] print:min-h-[5.5in] invoice-print-layout" >
-                               <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
-                                  <img src={logoBEF} alt="" className="w-[60%] h-auto object-contain" />
+                               <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none">
+                                  <img src={logoBEF} alt="" className="w-[60%] h-auto object-contain opacity-20" />
                                </div>
 
                                <div className="relative z-10 h-full w-full flex flex-col gap-4">
@@ -1334,8 +1363,8 @@ _${companyName}_`;
                       <div className="flex flex-col gap-4">
                          <div ref={printRefPakan} className="print:m-0 print:p-0 flex justify-center print:block">
                             <div className="w-full max-w-[9.5in] min-h-[5.5in] h-auto mx-auto bg-white text-black px-10 pt-8 pb-12 flex flex-col relative border border-slate-200 shadow-sm print:border-none print:shadow-none print:rounded-none rounded-2xl print:w-[9.5in] print:min-h-[5.5in] invoice-print-layout" >
-                               <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none opacity-20">
-                                  <img src={logoMBF} alt="" className="w-[60%] h-auto object-contain" />
+                               <div className="absolute inset-0 flex items-center justify-center z-0 pointer-events-none">
+                                  <img src={logoMBF} alt="" className="w-[60%] h-auto object-contain opacity-20" />
                                </div>
 
                                <div className="relative z-10 h-full w-full flex flex-col gap-4">
